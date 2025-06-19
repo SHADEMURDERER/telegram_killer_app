@@ -14,39 +14,37 @@ body {
   perspective: 1000px;
 }
 
-/* Контейнер для гифки (увеличен размер) */
+/* Контейнер для гифки */
 #ring-container {
   position: fixed;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
-  width: 90vw;
-  height: 90vh;
+  transform: translate(-50%, -50%) translateZ(0);
+  width: 100vw;
+  height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
   background-color: #2a2826;
-  border-radius: 50%;
-  box-shadow: 0 0 0 1000px #2a2826;
-  opacity: 1;
-  animation: fadeOutRing 1s 4.5s ease-out forwards;
+  transform-style: preserve-3d;
 }
 
-/* Размер гифки (увеличен) */
+/* Размер гифки */
 #ring {
-  width: 500px;
-  height: 500px;
+  width: 600px;
+  height: 600px;
   background: url('./images/anim.gif') center/contain no-repeat;
   animation: 
-    rotate 3s linear infinite,
-    zoomIn 3s ease-in forwards;
+    rotate 4s linear infinite,
+    initialZoom 2s ease-out forwards;
+  transform-style: preserve-3d;
 }
 
 /* Надпись Gizmo */
 #title {
   position: absolute;
-  top: 20%;
+  top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: 4.5rem;
@@ -55,9 +53,10 @@ body {
   text-shadow: 0 0 15px rgba(255,255,255,0.7);
   opacity: 0;
   filter: blur(15px);
+  z-index: 1001;
   animation: 
-    titleAppear 2s 3.5s cubic-bezier(0.2, 0.8, 0.3, 1.5) forwards,
-    titleMoveUp 2.5s 5.5s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+    titleAppear 1.5s 4s ease-out forwards,
+    titleMoveUp 1.5s 6s ease-out forwards;
 }
 
 /* Панель */
@@ -73,7 +72,8 @@ body {
   border-radius: 25px;
   padding: 25px;
   box-shadow: 0 -8px 30px rgba(0,0,0,0.4);
-  animation: slideUp 2s 5.5s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  z-index: 1002;
+  animation: slideUp 1.5s 6s ease-out forwards;
   will-change: transform;
   border: 1px solid #3a3836;
 }
@@ -84,36 +84,36 @@ body {
   to { transform: rotate(360deg); }
 }
 
-@keyframes zoomIn {
+@keyframes initialZoom {
   0% { transform: scale(0.5); opacity: 0; }
-  50% { transform: scale(1.1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
 }
 
-@keyframes fadeOutRing {
-  to { opacity: 0; }
+@keyframes flyThrough {
+  0% { transform: scale(1) translateZ(0); opacity: 1; }
+  100% { transform: scale(5) translateZ(800px); opacity: 0; }
 }
 
 @keyframes titleAppear {
-  0% { opacity: 0; filter: blur(15px); top: 15%; }
-  100% { opacity: 1; filter: blur(0); top: 25%; }
+  0% { opacity: 0; filter: blur(15px); transform: translate(-50%, -50%) scale(0.8); }
+  100% { opacity: 1; filter: blur(0); transform: translate(-50%, -50%) scale(1); }
 }
 
 @keyframes titleMoveUp {
-  0% { top: 25%; opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  100% { top: 12%; opacity: 0.6; transform: translate(-50%, -50%) scale(0.9); }
+  0% { top: 50%; opacity: 1; }
+  100% { top: 20%; opacity: 0.7; }
 }
 
 @keyframes slideUp {
-  0% { bottom: -300px; opacity: 0; transform: translateX(-50%) scale(0.95); }
-  100% { bottom: 30px; opacity: 1; transform: translateX(-50%) scale(1); }
+  0% { bottom: -300px; opacity: 0; }
+  100% { bottom: 30px; opacity: 1; }
 }
 
 /* Остальные стили */
 .tab-content { 
   display: none;
   text-align: center;
-  animation: fadeIn 0.5s ease-out;
 }
 .tab-content.active { display: block; }
 
@@ -146,11 +146,6 @@ body {
   background: rgba(58, 56, 54, 0.5);
   border-radius: 12px;
   border-left: 3px solid #7f5af0;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 </style>
 </head>
@@ -192,14 +187,22 @@ body {
 </div>
 
 <script>
-// Удаляем кольцо только после всех анимаций
+// Запуск анимации "влетания" через 4 секунды
 setTimeout(() => {
-  document.getElementById('ring-container').style.transition = 'opacity 1s ease';
-  document.getElementById('ring-container').style.opacity = '0';
+  // Останавливаем вращение
+  document.getElementById('ring').style.animation = 'none';
+  
+  // Запускаем анимацию влетания
+  document.getElementById('ring').style.animation = 'flyThrough 2s ease-out forwards';
+  
+  // Удаляем кольцо после анимации
   setTimeout(() => {
-    document.getElementById('ring-container').remove();
-  }, 1000);
-}, 5500);
+    document.getElementById('ring-container').style.opacity = '0';
+    setTimeout(() => {
+      document.getElementById('ring-container').remove();
+    }, 1000);
+  }, 2000);
+}, 4000);
 
 // Переключение вкладок
 function switchTab(tabName) {
