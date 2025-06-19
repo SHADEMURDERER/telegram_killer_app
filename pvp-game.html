@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Gizmo PVP</title>
-  <!-- Подключаем Firebase 9 (стабильная версия) -->
+  <!-- Firebase 9 (стабильная версия) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <style>
@@ -13,10 +13,15 @@
       font-family: Arial, sans-serif;
       text-align: center;
       padding: 20px;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
     #pvp-container {
-      max-width: 400px;
+      max-width: 500px;
       margin: 0 auto;
+      flex: 1;
     }
     #action-button {
       background: #7f5af0;
@@ -26,102 +31,111 @@
       font-size: 18px;
       border-radius: 10px;
       cursor: pointer;
-      margin-top: 20px;
+      margin: 20px 0;
+      transition: background 0.3s;
+    }
+    #action-button:hover {
+      background: #6a4ac9;
     }
     #action-button:disabled {
       background: #555;
       cursor: not-allowed;
     }
-    #game-status {
-      margin: 20px 0;
-      font-size: 18px;
-      min-height: 24px;
+    #version {
+      color: #7f5af0;
+      font-size: 12px;
+      margin-top: 30px;
     }
   </style>
 </head>
 <body>
 
 <div id="pvp-container">
-  <h2>⚔️ PVP Арена</h2>
+  <h1>⚔️ PVP Арена</h1>
   <div id="game-status">Нажмите кнопку ниже</div>
   <button id="action-button">Начать бой (50💰)</button>
   <div id="result"></div>
+  
+  <!-- Строка с версией -->
+  <div id="version">Build 0.1v</div>
 </div>
 
 <script>
-// 1. Инициализация Firebase
+// Инициализация Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
   databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
 };
 
-// Инициализируем Firebase
-const app = firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
-// 2. Создаем игрока
-const currentPlayer = {
-  id: 'player_' + Math.random().toString(36).slice(2, 9),
-  name: 'Игрок'
-};
-
-// 3. Получаем элементы интерфейса
-const actionButton = document.getElementById('action-button');
-const gameStatus = document.getElementById('game-status');
-const resultDisplay = document.getElementById('result');
-
-// 4. Обработчик кнопки
-actionButton.addEventListener('click', async () => {
-  actionButton.disabled = true;
-  gameStatus.textContent = "Создаём игру...";
+try {
+  const app = firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
   
-  try {
-    // Проверяем подключение к Firebase
-    await db.ref('connection_test').set({ timestamp: Date.now() });
+  // Проверка подключения
+  db.ref('.info/connected').on('value', (snap) => {
+    console.log(snap.val() ? "🔥 Firebase подключён" : "❌ Оффлайн");
+  });
+
+  // Обработчик кнопки
+  document.getElementById('action-button').addEventListener('click', async () => {
+    const button = document.getElementById('action-button');
+    button.disabled = true;
+    document.getElementById('game-status').textContent = "Создаём игру...";
     
-    // Создаем новую игру
-    const newGameRef = db.ref('games').push();
-    await newGameRef.set({
-      player1: currentPlayer,
-      status: 'waiting',
-      createdAt: Date.now()
-    });
-    
-    gameStatus.textContent = "Ожидаем соперника...";
-    actionButton.textContent = "Отменить игру";
-    
-    // Слушаем изменения игры
-    newGameRef.on('value', (snapshot) => {
-      const game = snapshot.val();
-      if (!game) return;
+    try {
+      // Тест записи
+      await db.ref('connection_test').set({ 
+        timestamp: Date.now(),
+        user: "test" 
+      });
       
-      if (game.status === 'playing') {
-        startGame(game);
-      }
-    });
-    
-  } catch (error) {
-    console.error("Ошибка Firebase:", error);
-    gameStatus.textContent = "Ошибка создания игры";
-    actionButton.disabled = false;
-  }
-});
+      // Создаём игру
+      const newGameRef = db.ref('games').push();
+      await newGameRef.set({
+        player1: {
+          id: 'player_' + Math.random().toString(36).slice(2, 9),
+          name: 'Игрок'
+        },
+        status: 'waiting',
+        createdAt: Date.now()
+      });
+      
+      document.getElementById('game-status').textContent = "Ожидаем соперника...";
+      button.textContent = "Отменить игру";
+      
+      // Следим за изменениями
+      newGameRef.on('value', (snapshot) => {
+        const game = snapshot.val();
+        if (game?.status === 'playing') {
+          startGame(game);
+        }
+      });
+      
+    } catch (error) {
+      console.error("Ошибка:", error);
+      document.getElementById('game-status').textContent = "Ошибка: " + error.message;
+      button.disabled = false;
+    }
+  });
 
-// Запуск игры
-function startGame(game) {
-  gameStatus.textContent = "Игра началась!";
-  actionButton.style.display = "none";
-  
-  // Симуляция боя (3 секунды)
-  setTimeout(() => {
-    const winner = Math.random() < 0.5 ? game.player1 : game.player2;
-    resultDisplay.textContent = winner.id === currentPlayer.id 
-      ? "🎉 Вы победили! +50💰" 
-      : "😢 Вы проиграли";
-    actionButton.style.display = "block";
-    actionButton.textContent = "Играть снова";
-    actionButton.disabled = false;
-  }, 3000);
+  function startGame(game) {
+    document.getElementById('game-status').textContent = "⚡ Бой начался!";
+    document.getElementById('action-button').style.display = 'none';
+    
+    setTimeout(() => {
+      const isWinner = Math.random() > 0.5;
+      document.getElementById('result').textContent = isWinner 
+        ? "🎉 Вы победили!" 
+        : "😢 Вы проиграли";
+      document.getElementById('action-button').style.display = 'block';
+      document.getElementById('action-button').textContent = "Играть снова";
+      document.getElementById('action-button').disabled = false;
+    }, 3000);
+  }
+
+} catch (error) {
+  console.error("Фатальная ошибка Firebase:", error);
+  document.getElementById('game-status').textContent = "Ошибка загрузки Firebase";
 }
 </script>
 </body>
