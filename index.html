@@ -303,39 +303,42 @@ function updateWheel() {
   const wheel = document.getElementById('wheel');
   wheel.innerHTML = '<div class="wheel-pointer"></div>';
   
-  const segments = player1Bet && player2Bet ? 2 : 1;
-  const angle = 360 / segments;
-  
-  for (let i = 0; i < segments; i++) {
-    const segment = document.createElement('div');
-    segment.className = 'wheel-segment';
-    segment.style.transform = `rotate(${angle * i}deg)`;
-    segment.style.backgroundColor = i === 0 ? player1Color : player2Color;
-    wheel.appendChild(segment);
+  if (player1Bet || player2Bet) {
+    const segments = player1Bet && player2Bet ? 2 : 1;
+    const angle = 360 / segments;
+    
+    for (let i = 0; i < segments; i++) {
+      const segment = document.createElement('div');
+      segment.className = 'wheel-segment';
+      segment.style.transform = `rotate(${angle * i}deg)`;
+      segment.style.backgroundColor = i === 0 ? player1Color : player2Color;
+      wheel.appendChild(segment);
+    }
   }
   
   if (player1Bet && player2Bet) {
     document.getElementById('pvp-chance').textContent = 'Шанс победы: 50% / 50%';
+    document.getElementById('pvp-bet').textContent = 'Запустить колесо!';
+    document.getElementById('pvp-bet').disabled = false;
   } else if (player1Bet) {
     document.getElementById('pvp-chance').textContent = 'Шанс победы: 100% (ждем второго игрока)';
-  } else if (player2Bet) {
-    document.getElementById('pvp-chance').textContent = 'Шанс победы: 100% (ждем второго игрока)';
+    document.getElementById('pvp-bet').textContent = 'Ожидание соперника...';
+    document.getElementById('pvp-bet').disabled = true;
   } else {
     document.getElementById('pvp-chance').textContent = 'Шанс победы: 50%';
+    document.getElementById('pvp-bet').textContent = 'Сделать ставку (50 золотых)';
+    document.getElementById('pvp-bet').disabled = false;
   }
 }
 
 function placeBet() {
   if (!player1Bet) {
     player1Bet = true;
-    document.getElementById('pvp-bet').textContent = 'Ставка сделана (ожидание соперника)';
-    document.getElementById('pvp-bet').disabled = true;
   } else if (!player2Bet) {
     player2Bet = true;
-    document.getElementById('pvp-bet').textContent = 'Запустить колесо!';
-    document.getElementById('pvp-bet').disabled = false;
   } else {
     spinWheel();
+    return;
   }
   
   updateWheel();
@@ -365,11 +368,11 @@ function spinWheel() {
     setTimeout(() => {
       player1Bet = false;
       player2Bet = false;
-      betButton.textContent = 'Сделать ставку (50 золотых)';
-      betButton.disabled = false;
       wheel.style.transition = 'none';
       wheel.style.transform = 'rotate(0deg)';
-      setTimeout(updateWheel, 10);
+      setTimeout(() => {
+        updateWheel();
+      }, 10);
     }, 3000);
   }, spinDuration);
 }
