@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Gizmo PVP</title>
+  <link rel="stylesheet" href="styles/main.css">
+  <link rel="stylesheet" href="styles/pvp-game.css">
+</head>
+<body>
+
+<div id="pvp-container">
+  <div id="pvp-status">Ожидание игроков...</div>
+  
+  <div class="player-info">
+    <div class="player">
+      <div class="player-color" id="player1-color"></div>
+      <span id="player1-name">Вы</span>
+    </div>
+    <div class="player">
+      <div class="player-color" id="player2-color"></div>
+      <span id="player2-name">Соперник</span>
+    </div>
+  </div>
+  
+  <div id="progress-bar">
+    <div id="progress-fill"></div>
+    <div id="progress-pointer"></div>
+  </div>
+  
+  <div id="pvp-result"></div>
+  <button id="pvp-bet" onclick="placeBet()">Сделать ставку (50 золотых)</button>
+</div>
+
+<script src="scripts/main.js"></script>
+<script src="scripts/pvp-game.js"></script>
+</body>
+</html>

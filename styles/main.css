@@ -1,0 +1,69 @@
+body {
+  margin: 0;
+  background: #2a2826;
+  color: white;
+  font-family: 'Arial', sans-serif;
+  height: 100vh;
+  overflow: hidden;
+  perspective: 1000px;
+}
+
+#panel {
+  position: fixed;
+  bottom: -300px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 500px;
+  background: rgba(42, 40, 38, 0.97);
+  backdrop-filter: blur(12px);
+  border-radius: 25px;
+  padding: 25px;
+  box-shadow: 0 -8px 30px rgba(0,0,0,0.4);
+  z-index: 1002;
+  animation: slideUp 1.5s 6s ease-out forwards;
+  will-change: transform;
+  border: 1px solid #3a3836;
+}
+
+.tab-content { 
+  display: none;
+  text-align: center;
+}
+.tab-content.active { display: block; }
+
+.tab-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 25px;
+  margin-bottom: 25px;
+}
+
+.tab-button {
+  background: none;
+  border: none;
+  color: white;
+  padding: 12px 25px;
+  font-size: 1.3rem;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.tab-button.active {
+  color: #7f5af0;
+  text-shadow: 0 0 8px #7f5af0;
+}
+
+.shop-item {
+  margin: 15px 0;
+  padding: 15px;
+  background: rgba(58, 56, 54, 0.5);
+  border-radius: 12px;
+  border-left: 3px solid #7f5af0;
+}
+
+@keyframes slideUp {
+  0% { bottom: -300px; opacity: 0; }
+  100% { bottom: 30px; opacity: 1; }
+}
