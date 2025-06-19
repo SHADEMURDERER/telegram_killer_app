@@ -35,6 +35,7 @@
 
 <script src="scripts/main.js"></script>
 <script src="scripts/pvp-game.js"></script>
+<!-- pvp-game.html - ОБНОВЛЕННАЯ СЕКЦИЯ СКРИПТА -->
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
@@ -43,58 +44,6 @@
   
   const app = firebase.initializeApp(firebaseConfig);
   window.db = firebase.getDatabase(app);
-  // Ваши текущие переменные
-  const currentPlayer = {
-    id: window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 'anon_' + Math.random().toString(36).slice(2),
-    name: window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || 'Игрок'
-  };
-
-  // Переписанная функция placeBet()
-  async function placeBet() {
-    const gamesRef = firebase.ref(db, 'games');
-    
-    // Ищем открытую игру
-    const snapshot = await firebase.get(gamesRef);
-    let availableGame = null;
-
-    if (snapshot.exists()) {
-      const games = snapshot.val();
-      availableGame = Object.keys(games).find(id => 
-        games[id].status === 'waiting' && 
-        games[id].player1 !== currentPlayer.id
-      );
-    }
-
-    if (availableGame) {
-      // Присоединяемся к игре
-      await firebase.set(firebase.ref(db, `games/${availableGame}`), {
-        player2: currentPlayer.id,
-        status: 'playing'
-      });
-      startGame(availableGame);
-    } else {
-      // Создаём новую игру
-      const newGameRef = firebase.push(firebase.ref(db, 'games'));
-      await firebase.set(newGameRef, {
-        player1: currentPlayer.id,
-        status: 'waiting'
-      });
-      listenToGame(newGameRef.key);
-    }
-  }
-
-  // Слушаем изменения игры
-  function listenToGame(gameId) {
-    firebase.onValue(firebase.ref(db, `games/${gameId}`), (snapshot) => {
-      const game = snapshot.val();
-      if (game.status === 'playing' && game.player2) {
-        startGame(game); // Ваша существующая функция
-      }
-    });
-  }
-
-  // Вешаем обработчик на кнопку
-  document.getElementById('pvp-bet').addEventListener('click', placeBet);
 </script>
 </body>
 </html>
