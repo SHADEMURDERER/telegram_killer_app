@@ -20,22 +20,27 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 80vw;
-  height: 80vh;
+  width: 90vw;
+  height: 90vh;
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  background-color: #2a2826;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1000px #2a2826;
+  opacity: 1;
+  animation: fadeOutRing 1s 4.5s ease-out forwards;
 }
 
 /* Размер гифки (увеличен) */
 #ring {
-  width: 400px;
-  height: 400px;
+  width: 500px;
+  height: 500px;
   background: url('./images/anim.gif') center/contain no-repeat;
   animation: 
-    zoomIn 3s cubic-bezier(0.2, 0.8, 0.3, 1) forwards,
-    flyThrough 2.5s 3s cubic-bezier(0.1, 0.6, 0.3, 1) forwards;
+    rotate 3s linear infinite,
+    zoomIn 3s ease-in forwards;
 }
 
 /* Надпись Gizmo */
@@ -63,49 +68,44 @@ body {
   transform: translateX(-50%);
   width: 90%;
   max-width: 500px;
-  background: rgba(30, 30, 46, 0.97);
+  background: rgba(42, 40, 38, 0.97);
   backdrop-filter: blur(12px);
   border-radius: 25px;
   padding: 25px;
   box-shadow: 0 -8px 30px rgba(0,0,0,0.4);
   animation: slideUp 2s 5.5s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
-  will-change: transform; /* Улучшает плавность */
+  will-change: transform;
+  border: 1px solid #3a3836;
 }
 
-/* Анимации с улучшенными параметрами */
+/* Анимации */
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 @keyframes zoomIn {
-  0% { transform: scale(0.3) rotate(0deg); opacity: 0; }
-  50% { transform: scale(1.1) rotate(180deg); opacity: 1; }
-  100% { transform: scale(1.8) rotate(360deg); opacity: 0; }
+  0% { transform: scale(0.5); opacity: 0; }
+  50% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
-@keyframes flyThrough {
-  0% { transform: scale(1.8) translateZ(0) rotate(360deg); opacity: 0.8; }
-  100% { transform: scale(4) translateZ(800px) rotate(720deg); opacity: 0; }
+@keyframes fadeOutRing {
+  to { opacity: 0; }
 }
 
 @keyframes titleAppear {
-  0% { 
-    opacity: 0; 
-    filter: blur(15px);
-    top: 15%;
-  }
-  100% { 
-    opacity: 1; 
-    filter: blur(0);
-    top: 25%;
-  }
+  0% { opacity: 0; filter: blur(15px); top: 15%; }
+  100% { opacity: 1; filter: blur(0); top: 25%; }
 }
 
 @keyframes titleMoveUp {
   0% { top: 25%; opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  50% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.05); }
   100% { top: 12%; opacity: 0.6; transform: translate(-50%, -50%) scale(0.9); }
 }
 
 @keyframes slideUp {
   0% { bottom: -300px; opacity: 0; transform: translateX(-50%) scale(0.95); }
-  60% { transform: translateX(-50%) scale(1.02); }
   100% { bottom: 30px; opacity: 1; transform: translateX(-50%) scale(1); }
 }
 
@@ -138,6 +138,14 @@ body {
 .tab-button.active {
   color: #7f5af0;
   text-shadow: 0 0 8px #7f5af0;
+}
+
+.shop-item {
+  margin: 15px 0;
+  padding: 15px;
+  background: rgba(58, 56, 54, 0.5);
+  border-radius: 12px;
+  border-left: 3px solid #7f5af0;
 }
 
 @keyframes fadeIn {
@@ -184,9 +192,10 @@ body {
 </div>
 
 <script>
-// Удаляем кольцо после анимации
+// Удаляем кольцо только после всех анимаций
 setTimeout(() => {
-  document.getElementById('ring-container').style.opacity = 0;
+  document.getElementById('ring-container').style.transition = 'opacity 1s ease';
+  document.getElementById('ring-container').style.opacity = '0';
   setTimeout(() => {
     document.getElementById('ring-container').remove();
   }, 1000);
