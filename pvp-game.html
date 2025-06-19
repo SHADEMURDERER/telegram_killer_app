@@ -3,19 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <title>Gizmo PVP</title>
+  <!-- Подключаем Firebase 9 (стабильная версия) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <style>
-    /* ВРЕМЕННЫЕ СТИЛИ прямо в HTML */
     body {
       background: #2a2826;
       color: white;
       font-family: Arial, sans-serif;
-      margin: 0;
+      text-align: center;
       padding: 20px;
     }
     #pvp-container {
       max-width: 400px;
       margin: 0 auto;
-      text-align: center;
     }
     #action-button {
       background: #7f5af0;
@@ -31,6 +32,11 @@
       background: #555;
       cursor: not-allowed;
     }
+    #game-status {
+      margin: 20px 0;
+      font-size: 18px;
+      min-height: 24px;
+    }
   </style>
 </head>
 <body>
@@ -42,10 +48,6 @@
   <div id="result"></div>
 </div>
 
-<!-- Подключаем Firebase -->
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
-
 <script>
 // 1. Инициализация Firebase
 const firebaseConfig = {
@@ -53,28 +55,33 @@ const firebaseConfig = {
   databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
 };
 
+// Инициализируем Firebase
 const app = firebase.initializeApp(firebaseConfig);
-const db = firebase.getDatabase(app);
+const db = firebase.database();
 
-// 2. Создаём игрока
+// 2. Создаем игрока
 const currentPlayer = {
   id: 'player_' + Math.random().toString(36).slice(2, 9),
   name: 'Игрок'
 };
 
-// 3. Получаем кнопку
+// 3. Получаем элементы интерфейса
 const actionButton = document.getElementById('action-button');
 const gameStatus = document.getElementById('game-status');
+const resultDisplay = document.getElementById('result');
 
-// 4. Вешаем обработчик
+// 4. Обработчик кнопки
 actionButton.addEventListener('click', async () => {
   actionButton.disabled = true;
   gameStatus.textContent = "Создаём игру...";
   
   try {
-    // Создаём новую игру в Firebase
-    const newGameRef = firebase.push(firebase.ref(db, 'games'));
-    await firebase.set(newGameRef, {
+    // Проверяем подключение к Firebase
+    await db.ref('connection_test').set({ timestamp: Date.now() });
+    
+    // Создаем новую игру
+    const newGameRef = db.ref('games').push();
+    await newGameRef.set({
       player1: currentPlayer,
       status: 'waiting',
       createdAt: Date.now()
@@ -84,28 +91,34 @@ actionButton.addEventListener('click', async () => {
     actionButton.textContent = "Отменить игру";
     
     // Слушаем изменения игры
-    firebase.onValue(newGameRef, (snapshot) => {
+    newGameRef.on('value', (snapshot) => {
       const game = snapshot.val();
       if (!game) return;
       
-      if (game.player2) {
-        gameStatus.textContent = "Игра началась!";
+      if (game.status === 'playing') {
         startGame(game);
       }
     });
     
   } catch (error) {
-    console.error("Ошибка:", error);
+    console.error("Ошибка Firebase:", error);
+    gameStatus.textContent = "Ошибка создания игры";
     actionButton.disabled = false;
   }
 });
 
+// Запуск игры
 function startGame(game) {
-  // Через 3 секунды определяем победителя
+  gameStatus.textContent = "Игра началась!";
+  actionButton.style.display = "none";
+  
+  // Симуляция боя (3 секунды)
   setTimeout(() => {
     const winner = Math.random() < 0.5 ? game.player1 : game.player2;
-    document.getElementById('result').textContent = 
-      winner.id === currentPlayer.id ? "Вы победили!" : "Вы проиграли";
+    resultDisplay.textContent = winner.id === currentPlayer.id 
+      ? "🎉 Вы победили! +50💰" 
+      : "😢 Вы проиграли";
+    actionButton.style.display = "block";
     actionButton.textContent = "Играть снова";
     actionButton.disabled = false;
   }, 3000);
