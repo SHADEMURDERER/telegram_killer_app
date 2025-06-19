@@ -16,7 +16,7 @@
 #ring {
   width: 600px;
   height: 600px;
-  background: url('telegram_killer_app/images/anim.gif') center/contain no-repeat;
+  background: url('../images/anim.gif') center/contain no-repeat;
   animation: 
     rotate 4s linear infinite,
     initialZoom 2s ease-out forwards;
