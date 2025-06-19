@@ -259,18 +259,48 @@ body {
 </div>
 
 <script>
-setTimeout(() => {
-  document.getElementById('ring').style.animation = 'none';
+// Глобальные переменные
+let playerId = Math.random().toString(36).substring(2, 15);
+let gameState = {
+  player1: null,
+  player2: null,
+  spinning: false
+};
+
+// Инициализация при загрузке
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.Telegram && Telegram.WebApp) {
+    const user = Telegram.WebApp.initDataUnsafe.user;
+    if (user?.first_name) {
+      document.getElementById('username').textContent = user.first_name;
+    }
+    Telegram.WebApp.expand();
+  }
   
-  document.getElementById('ring').style.animation = 'flyThrough 2s ease-out forwards';
+  const elements = document.querySelectorAll('#ring, #title, #panel');
+  elements.forEach(el => {
+    el.style.willChange = 'transform, opacity, filter';
+  });
   
+  // Загрузка состояния игры
+  loadGameState();
+  
+  // Запуск анимации через 4 секунды
   setTimeout(() => {
-    document.getElementById('ring-container').style.opacity = '0';
+    document.getElementById('ring').style.animation = 'none';
+    document.getElementById('ring').style.animation = 'flyThrough 2s ease-out forwards';
+    
     setTimeout(() => {
-      document.getElementById('ring-container').remove();
-    }, 1000);
-  }, 2000);
-}, 4000);
+      document.getElementById('ring-container').style.opacity = '0';
+      setTimeout(() => {
+        document.getElementById('ring-container').remove();
+      }, 1000);
+    }, 2000);
+  }, 4000);
+  
+  // Проверка состояния игры каждую секунду
+  setInterval(checkGameState, 1000);
+});
 
 function switchTab(tabName) {
   document.querySelectorAll('.tab-content').forEach(tab => {
@@ -285,71 +315,116 @@ function switchTab(tabName) {
 }
 
 // PVP Wheel Logic
-let player1Bet = false;
-let player2Bet = false;
-let player1Color = '#FF5252';
-let player2Color = '#4FC3F7';
-
 function openPvpWheel() {
   document.getElementById('pvp-wheel-container').style.display = 'flex';
-  updateWheel();
+  updateWheelUI();
 }
 
 function closePvpWheel() {
   document.getElementById('pvp-wheel-container').style.display = 'none';
 }
 
-function updateWheel() {
+function loadGameState() {
+  const savedState = localStorage.getItem('pvpWheelState');
+  if (savedState) {
+    gameState = JSON.parse(savedState);
+  }
+  updateWheelUI();
+}
+
+function saveGameState() {
+  localStorage.setItem('pvpWheelState', JSON.stringify(gameState));
+}
+
+function checkGameState() {
+  const oldState = JSON.stringify(gameState);
+  loadGameState();
+  
+  if (gameState.spinning) {
+    // Игра уже идет, обновляем UI
+    updateWheelUI();
+    return;
+  }
+  
+  if (gameState.player1 && gameState.player2 && !gameState.spinning) {
+    // Оба игрока сделали ставки - запускаем колесо
+    startSpinning();
+  }
+  
+  if (JSON.stringify(gameState) !== oldState) {
+    updateWheelUI();
+  }
+}
+
+function updateWheelUI() {
   const wheel = document.getElementById('wheel');
+  const betButton = document.getElementById('pvp-bet');
+  
   wheel.innerHTML = '<div class="wheel-pointer"></div>';
   
-  if (player1Bet || player2Bet) {
-    const segments = player1Bet && player2Bet ? 2 : 1;
+  // Проверяем, сделал ли текущий игрок ставку
+  const isPlayer1 = gameState.player1 === playerId;
+  const isPlayer2 = gameState.player2 === playerId;
+  const hasBet = isPlayer1 || isPlayer2;
+  
+  if (gameState.player1 || gameState.player2) {
+    const segments = gameState.player1 && gameState.player2 ? 2 : 1;
     const angle = 360 / segments;
     
     for (let i = 0; i < segments; i++) {
       const segment = document.createElement('div');
       segment.className = 'wheel-segment';
       segment.style.transform = `rotate(${angle * i}deg)`;
-      segment.style.backgroundColor = i === 0 ? player1Color : player2Color;
+      segment.style.backgroundColor = i === 0 ? '#FF5252' : '#4FC3F7';
       wheel.appendChild(segment);
     }
   }
   
-  if (player1Bet && player2Bet) {
+  if (gameState.spinning) {
+    betButton.disabled = true;
+    betButton.textContent = 'Колесо крутится...';
+    document.getElementById('pvp-chance').textContent = 'Идет игра...';
+  } else if (gameState.player1 && gameState.player2) {
+    betButton.disabled = hasBet;
+    betButton.textContent = hasBet ? 'Ожидание запуска...' : 'Присоединиться к игре';
     document.getElementById('pvp-chance').textContent = 'Шанс победы: 50% / 50%';
-    document.getElementById('pvp-bet').textContent = 'Запустить колесо!';
-    document.getElementById('pvp-bet').disabled = false;
-  } else if (player1Bet) {
-    document.getElementById('pvp-chance').textContent = 'Шанс победы: 100% (ждем второго игрока)';
-    document.getElementById('pvp-bet').textContent = 'Ожидание соперника...';
-    document.getElementById('pvp-bet').disabled = true;
+  } else if (gameState.player1 || gameState.player2) {
+    if (hasBet) {
+      betButton.disabled = true;
+      betButton.textContent = 'Ожидание соперника...';
+      document.getElementById('pvp-chance').textContent = 'Шанс победы: 100% (ждем второго игрока)';
+    } else {
+      betButton.disabled = false;
+      betButton.textContent = 'Присоединиться (50 золотых)';
+      document.getElementById('pvp-chance').textContent = 'Шанс победы: 50%';
+    }
   } else {
+    betButton.disabled = false;
+    betButton.textContent = 'Создать игру (50 золотых)';
     document.getElementById('pvp-chance').textContent = 'Шанс победы: 50%';
-    document.getElementById('pvp-bet').textContent = 'Сделать ставку (50 золотых)';
-    document.getElementById('pvp-bet').disabled = false;
   }
 }
 
 function placeBet() {
-  if (!player1Bet) {
-    player1Bet = true;
-  } else if (!player2Bet) {
-    player2Bet = true;
-  } else {
-    spinWheel();
-    return;
+  if (gameState.spinning) return;
+  
+  if (!gameState.player1) {
+    gameState.player1 = playerId;
+  } else if (!gameState.player2 && gameState.player1 !== playerId) {
+    gameState.player2 = playerId;
   }
   
-  updateWheel();
+  saveGameState();
+  updateWheelUI();
 }
 
-function spinWheel() {
+function startSpinning() {
+  gameState.spinning = true;
+  saveGameState();
+  
   const wheel = document.getElementById('wheel');
   const result = document.getElementById('wheel-result');
-  const betButton = document.getElementById('pvp-bet');
   
-  betButton.disabled = true;
   result.textContent = '';
   
   const spinDuration = 3000;
@@ -366,33 +441,20 @@ function spinWheel() {
     result.textContent = `Победитель: ${winner}!`;
     
     setTimeout(() => {
-      player1Bet = false;
-      player2Bet = false;
+      // Сброс игры
+      gameState.player1 = null;
+      gameState.player2 = null;
+      gameState.spinning = false;
+      saveGameState();
+      
       wheel.style.transition = 'none';
       wheel.style.transform = 'rotate(0deg)';
       setTimeout(() => {
-        updateWheel();
+        updateWheelUI();
       }, 10);
     }, 3000);
   }, spinDuration);
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-  if (window.Telegram && Telegram.WebApp) {
-    const user = Telegram.WebApp.initDataUnsafe.user;
-    if (user?.first_name) {
-      document.getElementById('username').textContent = user.first_name;
-    }
-    Telegram.WebApp.expand();
-  }
-  
-  const elements = document.querySelectorAll('#ring, #title, #panel');
-  elements.forEach(el => {
-    el.style.willChange = 'transform, opacity, filter';
-  });
-  
-  updateWheel();
-});
 </script>
 </body>
 </html>
