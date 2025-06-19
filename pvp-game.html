@@ -49,15 +49,9 @@ const firebaseConfig = {
   databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
 };
 
-// Проверка инициализации Firebase
-let app;
-let db;
-try {
-  app = firebase.initializeApp(firebaseConfig);
-  db = firebase.database();
-} catch (e) {
-  console.error("Firebase initialization error:", e);
-}
+// Инициализация приложения
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
 // Текущий игрок
 const currentPlayer = {
@@ -68,7 +62,7 @@ const currentPlayer = {
 
 let currentRoomId = null;
 let currentRoomRef = null;
-let roomsRef = null;
+let roomsRef = db.ref('rooms');
 
 // Элементы интерфейса
 const roomsList = document.getElementById('rooms-list');
@@ -82,28 +76,16 @@ const leaveRoomBtn = document.getElementById('leave-room-btn');
 
 // Инициализация
 function initPVPRoomSystem() {
-  if (!firebase.apps.length) {
-    console.error("Firebase not initialized");
-    return;
-  }
-
-  roomsRef = db.ref('rooms');
-  
-  // Проверка существования ссылки
-  if (!roomsRef) {
-    console.error("Failed to get rooms reference");
-    return;
-  }
-
   createRoomBtn.addEventListener('click', showCreateRoomModal);
   readyBtn.addEventListener('click', toggleReadyStatus);
   leaveRoomBtn.addEventListener('click', leaveRoom);
   
   loadRooms();
   
-  // Добавляем обработчик ошибок
-  roomsRef.on('value', updateRoomsList, (error) => {
-    console.error("Firebase read failed:", error);
+  roomsRef.on('value', (snapshot) => {
+    updateRoomsList(snapshot);
+  }, (error) => {
+    console.log("Ошибка чтения комнат:", error);
   });
 }
 
