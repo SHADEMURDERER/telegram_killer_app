@@ -6,7 +6,7 @@
 <style>
 body {
   margin: 0;
-  background: #1e1e2e;
+  background: #2a2826;
   color: white;
   font-family: 'Arial', sans-serif;
   height: 100vh;
@@ -14,120 +14,135 @@ body {
   perspective: 1000px;
 }
 
-/* Контейнер для гифки (уменьшен размер) */
+/* Контейнер для гифки (увеличен размер) */
 #ring-container {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 300px; /* Фиксированный размер */
-  height: 300px;
+  width: 80vw;
+  height: 80vh;
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
 }
 
-/* Размер гифки (уменьшен) */
+/* Размер гифки (увеличен) */
 #ring {
-  width: 150px;
-  height: 150px;
+  width: 400px;
+  height: 400px;
   background: url('./images/anim.gif') center/contain no-repeat;
   animation: 
-    zoomIn 2s ease-in forwards,
-    flyThrough 2s 2s ease-in forwards;
+    zoomIn 3s cubic-bezier(0.2, 0.8, 0.3, 1) forwards,
+    flyThrough 2.5s 3s cubic-bezier(0.1, 0.6, 0.3, 1) forwards;
 }
 
-/* Надпись Gizmo - теперь сверху вниз */
+/* Надпись Gizmo */
 #title {
   position: absolute;
-  top: 20%; /* Начинается выше */
+  top: 20%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 4rem;
+  font-size: 4.5rem;
   font-weight: bold;
   color: white;
-  text-shadow: 0 0 10px rgba(255,255,255,0.5);
+  text-shadow: 0 0 15px rgba(255,255,255,0.7);
   opacity: 0;
-  filter: blur(10px);
+  filter: blur(15px);
   animation: 
-    titleAppear 1.5s 3s ease-out forwards,
-    titleMoveUp 1s 4s ease-in-out forwards; /* Синхронизировано с панелью */
+    titleAppear 2s 3.5s cubic-bezier(0.2, 0.8, 0.3, 1.5) forwards,
+    titleMoveUp 2.5s 5.5s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
 }
 
-/* Переработанная панель (уже и по центру) */
+/* Панель */
 #panel {
   position: fixed;
-  bottom: -200px;
+  bottom: -300px;
   left: 50%;
   transform: translateX(-50%);
-  width: 90%; /* Уже чем было */
-  max-width: 500px; /* Максимальная ширина */
-  background: rgba(30, 30, 46, 0.95);
-  backdrop-filter: blur(10px);
-  border-radius: 20px; /* Закругление со всех сторон */
-  padding: 20px;
-  box-shadow: 0 -5px 20px rgba(0,0,0,0.3);
-  animation: slideUp 1s 4s ease-in-out forwards; /* Синхронизировано с надписью */
+  width: 90%;
+  max-width: 500px;
+  background: rgba(30, 30, 46, 0.97);
+  backdrop-filter: blur(12px);
+  border-radius: 25px;
+  padding: 25px;
+  box-shadow: 0 -8px 30px rgba(0,0,0,0.4);
+  animation: slideUp 2s 5.5s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  will-change: transform; /* Улучшает плавность */
 }
 
-/* Анимации */
+/* Анимации с улучшенными параметрами */
 @keyframes zoomIn {
-  0% { transform: scale(0.1); opacity: 0; }
-  50% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(2); opacity: 0; } /* Меньше конечное увеличение */
+  0% { transform: scale(0.3) rotate(0deg); opacity: 0; }
+  50% { transform: scale(1.1) rotate(180deg); opacity: 1; }
+  100% { transform: scale(1.8) rotate(360deg); opacity: 0; }
 }
 
 @keyframes flyThrough {
-  0% { transform: scale(2) translateZ(0); opacity: 0; }
-  100% { transform: scale(5) translateZ(500px); opacity: 0; }
+  0% { transform: scale(1.8) translateZ(0) rotate(360deg); opacity: 0.8; }
+  100% { transform: scale(4) translateZ(800px) rotate(720deg); opacity: 0; }
 }
 
 @keyframes titleAppear {
   0% { 
     opacity: 0; 
-    filter: blur(10px); 
-    top: 15%; /* Начинает выше */
+    filter: blur(15px);
+    top: 15%;
   }
   100% { 
     opacity: 1; 
-    filter: blur(0); 
-    top: 25%; /* Останавливается ниже */
+    filter: blur(0);
+    top: 25%;
   }
 }
 
 @keyframes titleMoveUp {
-  0% { top: 25%; opacity: 1; }
-  100% { top: 10%; opacity: 0.5; } /* Медленнее и плавнее */
+  0% { top: 25%; opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.05); }
+  100% { top: 12%; opacity: 0.6; transform: translate(-50%, -50%) scale(0.9); }
 }
 
 @keyframes slideUp {
-  0% { bottom: -200px; opacity: 0; }
-  100% { bottom: 20px; opacity: 1; } /* Поднимается не до конца */
+  0% { bottom: -300px; opacity: 0; transform: translateX(-50%) scale(0.95); }
+  60% { transform: translateX(-50%) scale(1.02); }
+  100% { bottom: 30px; opacity: 1; transform: translateX(-50%) scale(1); }
 }
 
-/* Стили для контента */
+/* Остальные стили */
 .tab-content { 
   display: none;
-  text-align: center; /* Выравнивание по центру */
+  text-align: center;
+  animation: fadeIn 0.5s ease-out;
 }
 .tab-content.active { display: block; }
 
 .tab-buttons {
   display: flex;
-  justify-content: center; /* Кнопки по центру */
-  gap: 20px;
-  margin-bottom: 20px;
+  justify-content: center;
+  gap: 25px;
+  margin-bottom: 25px;
 }
 
 .tab-button {
   background: none;
   border: none;
   color: white;
-  padding: 10px 20px;
-  font-size: 1.2rem;
+  padding: 12px 25px;
+  font-size: 1.3rem;
   cursor: pointer;
   position: relative;
+  transition: all 0.3s ease;
+}
+
+.tab-button.active {
+  color: #7f5af0;
+  text-shadow: 0 0 8px #7f5af0;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 </style>
 </head>
@@ -143,7 +158,7 @@ body {
 
 <!-- Основной контент -->
 <div id="content">
-  <!-- Панель (уже и по центру) -->
+  <!-- Панель -->
   <div id="panel">
     <div class="tab-buttons">
       <button class="tab-button active" onclick="switchTab('profile')">Профиль</button>
@@ -157,12 +172,12 @@ body {
     
     <div id="shop" class="tab-content">
       <div class="shop-item">
-        <h3>Меч Дракона</h3>
-        <p>100 золотых</p>
+        <h3>🗡️ Меч Дракона</h3>
+        <p style="color: #f8d56b;">100 золотых</p>
       </div>
       <div class="shop-item">
-        <h3>Щит Рыцаря</h3>
-        <p>75 золотых</p>
+        <h3>🛡️ Щит Рыцаря</h3>
+        <p style="color: #f8d56b;">75 золотых</p>
       </div>
     </div>
   </div>
@@ -171,8 +186,11 @@ body {
 <script>
 // Удаляем кольцо после анимации
 setTimeout(() => {
-  document.getElementById('ring-container').remove();
-}, 4000);
+  document.getElementById('ring-container').style.opacity = 0;
+  setTimeout(() => {
+    document.getElementById('ring-container').remove();
+  }, 1000);
+}, 5500);
 
 // Переключение вкладок
 function switchTab(tabName) {
@@ -196,6 +214,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     Telegram.WebApp.expand();
   }
+  
+  // Оптимизация анимаций
+  const elements = document.querySelectorAll('#ring, #title, #panel');
+  elements.forEach(el => {
+    el.style.willChange = 'transform, opacity, filter';
+  });
 });
 </script>
 </body>
