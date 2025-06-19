@@ -1,111 +1,101 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
   <meta charset="UTF-8">
   <title>Gizmo PVP</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <style>
-    /* Стили остаются без изменений */
+    body {
+      background: #2a2826;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      margin: 0;
+    }
+    #pvp-container {
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    #action-button {
+      background: #7f5af0;
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      font-size: 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      margin: 20px 0;
+    }
+    #version {
+      color: #7f5af0;
+      font-size: 12px;
+      margin-top: 30px;
+    }
   </style>
 </head>
 <body>
 
 <div id="pvp-container">
-  <!-- Интерфейс без изменений -->
-  <div id="version">Build 0.2v (fixed matchmaking)</div>
+  <h1>⚔️ PVP Арена</h1>
+  <div id="game-status">Нажмите кнопку ниже</div>
+  <button id="action-button">Начать бой (50💰)</button>
+  <div id="result"></div>
+  <div id="version">Build 0.4v (fixed null error)</div>
 </div>
 
 <script>
-// 1. Инициализация
-const firebaseConfig = {
-  apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
-  databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
+// 1. Проверяем, что все DOM-элементы существуют
+const elements = {
+  button: document.getElementById('action-button'),
+  status: document.getElementById('game-status'),
+  result: document.getElementById('result')
 };
 
-const app = firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+if (!elements.button || !elements.status || !elements.result) {
+  console.error("Ошибка: Не найдены необходимые элементы DOM");
+  elements.status.textContent = "Ошибка загрузки интерфейса";
+} else {
+  // 2. Инициализация Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
+    databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
+  };
 
-// 2. Глобальные переменные
-let currentGameId = null;
-const currentPlayer = {
-  id: 'player_' + Math.random().toString(36).slice(2, 9),
-  name: 'Игрок'
-};
-
-// 3. Поиск активных игр
-async function findOpenGame() {
-  const snapshot = await db.ref('games').orderByChild('status').equalTo('waiting').once('value');
-  const games = snapshot.val() || {};
-  
-  for (const [gameId, game] of Object.entries(games)) {
-    if (game.player1.id !== currentPlayer.id) {
-      return { gameId, game };
-    }
-  }
-  return null;
-}
-
-// 4. Основной обработчик
-document.getElementById('action-button').addEventListener('click', async () => {
-  const button = document.getElementById('action-button');
-  button.disabled = true;
-  
   try {
-    // Поиск существующей игры
-    const openGame = await findOpenGame();
-    
-    if (openGame) {
-      // Присоединяемся к игре
-      await db.ref(`games/${openGame.gameId}`).update({
-        player2: currentPlayer,
-        status: 'playing'
-      });
-      currentGameId = openGame.gameId;
-      startGame();
-    } else {
-      // Создаём новую игру
-      const newGameRef = db.ref('games').push();
-      currentGameId = newGameRef.key;
-      await newGameRef.set({
-        player1: currentPlayer,
-        status: 'waiting',
-        createdAt: Date.now()
-      });
-      waitForOpponent();
-    }
-  } catch (error) {
-    console.error("Matchmaking error:", error);
-    button.disabled = false;
-  }
-});
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-// 5. Логика игры
-function waitForOpponent() {
-  db.ref(`games/${currentGameId}`).on('value', (snapshot) => {
-    const game = snapshot.val();
-    if (game?.status === 'playing') {
-      startGame();
-    }
-  });
-}
+    // 3. Обработчик кнопки с защитой от ошибок
+    elements.button.addEventListener('click', async () => {
+      try {
+        elements.button.disabled = true;
+        elements.status.textContent = "Создаём игру...";
+        
+        // Тест записи
+        await db.ref('connection_test').set({ timestamp: Date.now() });
+        
+        // Создаем игру
+        const newGameRef = db.ref('games').push();
+        await newGameRef.set({
+          player1: { id: 'test_id', name: 'Тестовый игрок' },
+          status: 'waiting'
+        });
 
-function startGame() {
-  db.ref(`games/${currentGameId}`).update({ status: 'started' });
-  
-  // Симуляция боя
-  setTimeout(() => {
-    const winner = Math.random() > 0.5 ? 'player1' : 'player2';
-    db.ref(`games/${currentGameId}`).update({ 
-      status: 'finished',
-      winner
+        elements.status.textContent = "Ожидаем соперника...";
+        console.log("Игра создана, ID:", newGameRef.key);
+      } catch (error) {
+        console.error("Ошибка Firebase:", error);
+        elements.status.textContent = "Ошибка: " + error.message;
+        elements.button.disabled = false;
+      }
     });
-    showResult(winner);
-  }, 3000);
-}
 
-function showResult(winner) {
-  // Обновляем интерфейс
+  } catch (error) {
+    console.error("Ошибка инициализации Firebase:", error);
+    elements.status.textContent = "Ошибка подключения к серверу";
+  }
 }
 </script>
 </body>
