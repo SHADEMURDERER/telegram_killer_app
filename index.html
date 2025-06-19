@@ -8,18 +8,40 @@
         body {
             background-color: black;
             color: white;
-            font-family: Arial, sans-serif;
+            font-family: 'Arial', sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
             margin: 0;
-            font-size: 3rem;
+        }
+        
+        .gizmo-text {
+            font-size: 5rem;
             font-weight: bold;
+            text-shadow: 
+                0 0 10px #00ff00, 
+                0 0 20px #00ff00,
+                0 0 30px #00ff00;  /* Усиленный неоновый эффект */
+            animation: glow 1.5s ease-in-out infinite alternate;
+        }
+        
+        @keyframes glow {
+            from {
+                text-shadow: 
+                    0 0 5px #00ff00,
+                    0 0 10px #00ff00;
+            }
+            to {
+                text-shadow: 
+                    0 0 10px #00ff00,
+                    0 0 20px #00ff00,
+                    0 0 30px #00ff77;
+            }
         }
     </style>
 </head>
 <body>
-    Gizmo
+    <div class="gizmo-text">Gizmo</div>
 </body>
 </html>
