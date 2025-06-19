@@ -6,7 +6,7 @@
   <style>
     body {
       margin: 0;
-      background: #1e1e2e;
+      background: #2a2826;
       color: white;
       font-family: 'Arial', sans-serif;
       height: 100vh;
@@ -17,11 +17,67 @@
       justify-content: center;
     }
 
+    /* Анимация загрузки */
+    #loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      animation: fadeOut 1s 3s forwards;
+    }
+
+    #loading-text {
+      font-size: 4rem;
+      font-weight: bold;
+      text-shadow: 0 0 15px #00ff00;
+      animation: pulse 1.5s infinite alternate;
+    }
+
+    /* Анимация кольца */
+    #ring-container {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
+
+    #ring {
+      width: 600px;
+      height: 600px;
+      background: url('.image/anim.gif') center/contain no-repeat;
+      animation: 
+        rotate 4s linear infinite,
+        zoomIn 2s ease-out forwards,
+        flyThrough 2s 4s ease-out forwards;
+      transform-style: preserve-3d;
+    }
+
+    /* Основной интерфейс */
+    #main-interface {
+      display: none;
+      opacity: 0;
+      animation: fadeIn 1s 3.5s forwards;
+    }
+
     #wheel-container {
       position: relative;
       width: 400px;
       height: 400px;
       margin: 20px auto;
+      transform-style: preserve-3d;
+      perspective: 1000px;
     }
 
     #wheel {
@@ -30,10 +86,13 @@
       border-radius: 50%;
       position: relative;
       overflow: hidden;
-      transition: transform 5s cubic-bezier(0.17, 0.67, 0.12, 0.99);
+      transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99);
       transform: rotate(0deg);
-      border: 8px solid #2a2826;
-      box-shadow: 0 0 20px rgba(0,0,0,0.5);
+      border: 10px solid #2a2826;
+      box-shadow: 
+        0 0 30px rgba(0,0,0,0.8),
+        0 0 0 10px #7f5af0,
+        0 0 40px rgba(127, 90, 240, 0.5);
     }
 
     .wheel-section {
@@ -45,17 +104,21 @@
       align-items: center;
       justify-content: center;
       font-weight: bold;
-      font-size: 14px;
+      font-size: 16px;
       box-sizing: border-box;
       padding-bottom: 40%;
       padding-left: 10%;
+      color: white;
+      text-shadow: 0 0 5px black;
     }
 
     #timer {
-      font-size: 3rem;
+      font-size: 3.5rem;
       font-weight: bold;
       margin: 20px 0;
-      height: 60px;
+      height: 80px;
+      text-shadow: 0 0 10px #7f5af0;
+      animation: glow 2s infinite alternate;
     }
 
     #bet-controls {
@@ -63,38 +126,47 @@
       flex-direction: column;
       align-items: center;
       margin-top: 20px;
+      background: rgba(42, 40, 38, 0.8);
+      padding: 20px;
+      border-radius: 15px;
+      border: 1px solid #7f5af0;
+      box-shadow: 0 0 20px rgba(127, 90, 240, 0.3);
     }
 
     #bet-amount {
       width: 200px;
-      margin-bottom: 10px;
+      margin-bottom: 15px;
       background: rgba(58, 56, 54, 0.7);
-      border: 1px solid #3a3836;
+      border: 1px solid #7f5af0;
       border-radius: 8px;
-      padding: 10px;
+      padding: 12px;
       color: white;
       font-size: 1.2rem;
       text-align: center;
     }
 
     #place-bet {
-      background: #7f5af0;
+      background: linear-gradient(135deg, #7f5af0, #6a4ac9);
       border: none;
       border-radius: 8px;
-      padding: 12px 25px;
+      padding: 15px 30px;
       color: white;
       font-size: 1.2rem;
       cursor: pointer;
       transition: all 0.3s;
+      box-shadow: 0 0 15px rgba(127, 90, 240, 0.5);
     }
 
     #place-bet:hover {
-      background: #6a4ac9;
+      transform: translateY(-2px);
+      box-shadow: 0 0 20px rgba(127, 90, 240, 0.8);
     }
 
     #place-bet:disabled {
       background: #3a3836;
+      box-shadow: none;
       cursor: not-allowed;
+      transform: none;
     }
 
     #players {
@@ -107,10 +179,16 @@
     .player {
       background: rgba(42, 40, 38, 0.8);
       border-radius: 10px;
-      padding: 15px;
-      min-width: 150px;
+      padding: 20px;
+      min-width: 180px;
       text-align: center;
-      border: 1px solid #3a3836;
+      border: 1px solid #7f5af0;
+      box-shadow: 0 0 15px rgba(127, 90, 240, 0.2);
+    }
+
+    .player h3 {
+      margin-top: 0;
+      color: #7f5af0;
     }
 
     .player-color {
@@ -119,49 +197,105 @@
       border-radius: 50%;
       display: inline-block;
       margin-right: 10px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.5);
     }
 
     #current-bets {
       margin-top: 20px;
       text-align: center;
+      background: rgba(42, 40, 38, 0.8);
+      padding: 15px;
+      border-radius: 10px;
+      border: 1px solid #7f5af0;
+      max-width: 500px;
+      width: 90%;
     }
 
     #total-pot {
-      font-size: 1.5rem;
+      font-size: 1.8rem;
       font-weight: bold;
-      margin-top: 10px;
+      margin-top: 15px;
       color: #f8d56b;
+      text-shadow: 0 0 5px rgba(248, 213, 107, 0.5);
+    }
+
+    /* Анимации */
+    @keyframes fadeOut {
+      to { opacity: 0; visibility: hidden; }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(1.05); opacity: 1; text-shadow: 0 0 20px #00ff00; }
+    }
+
+    @keyframes rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes zoomIn {
+      0% { transform: scale(0.5); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    @keyframes flyThrough {
+      0% { transform: scale(1) translateZ(0); opacity: 1; }
+      100% { transform: scale(5) translateZ(800px); opacity: 0; }
+    }
+
+    @keyframes glow {
+      0% { text-shadow: 0 0 10px #7f5af0; }
+      100% { text-shadow: 0 0 20px #7f5af0, 0 0 30px #7f5af0; }
     }
   </style>
   <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
 </head>
 <body>
-  <div id="wheel-container">
-    <div id="wheel"></div>
+  <!-- Анимация кольца -->
+  <div id="ring-container">
+    <div id="ring"></div>
   </div>
 
-  <div id="timer"></div>
-
-  <div id="current-bets">
-    <h3>Текущие ставки</h3>
-    <div id="bets-list"></div>
-    <div id="total-pot">Общий банк: 0 монет</div>
+  <!-- Анимация загрузки -->
+  <div id="loading-screen">
+    <div id="loading-text">GIZMO WHEEL</div>
   </div>
 
-  <div id="bet-controls">
-    <input type="number" id="bet-amount" min="1" max="100" placeholder="Количество монет">
-    <button id="place-bet">Сделать ставку</button>
-  </div>
-
-  <div id="players">
-    <div class="player">
-      <h3>Ваш баланс</h3>
-      <div id="your-balance">100 монет</div>
+  <!-- Основной интерфейс -->
+  <div id="main-interface">
+    <div id="wheel-container">
+      <div id="wheel"></div>
     </div>
-    <div class="player">
-      <h3>Другие игроки</h3>
-      <div id="other-players">Ожидание игроков...</div>
+
+    <div id="timer"></div>
+
+    <div id="current-bets">
+      <h3>Текущие ставки</h3>
+      <div id="bets-list"></div>
+      <div id="total-pot">Общий банк: 0 монет</div>
+    </div>
+
+    <div id="bet-controls">
+      <input type="number" id="bet-amount" min="1" placeholder="Количество монет (1-100)">
+      <button id="place-bet">Сделать ставку</button>
+    </div>
+
+    <div id="players">
+      <div class="player">
+        <h3>Ваш баланс</h3>
+        <div id="your-balance">100 монет</div>
+      </div>
+      <div class="player">
+        <h3>Другие игроки</h3>
+        <div id="other-players">Ожидание игроков...</div>
+      </div>
     </div>
   </div>
 
@@ -208,27 +342,36 @@
     const otherPlayers = document.getElementById('other-players');
     const betsList = document.getElementById('bets-list');
     const totalPot = document.getElementById('total-pot');
+    const loadingScreen = document.getElementById('loading-screen');
+    const mainInterface = document.getElementById('main-interface');
+    const ring = document.getElementById('ring');
 
     // Инициализация при загрузке
     document.addEventListener('DOMContentLoaded', () => {
       initPlayer();
       initGame();
       setupEventListeners();
+      
+      // Показываем основной интерфейс после загрузки
+      setTimeout(() => {
+        mainInterface.style.display = 'flex';
+      }, 3500);
     });
 
     function initPlayer() {
       // Генерируем уникальный ID для игрока
       currentPlayer.id = generatePlayerId();
       
-      // Если это Telegram WebApp, используем данные пользователя
+      // Используем данные из Telegram WebApp
       if (window.Telegram && Telegram.WebApp) {
         const tgUser = Telegram.WebApp.initDataUnsafe.user;
         if (tgUser) {
-          currentPlayer.name = tgUser.first_name || 'Telegram User';
+          currentPlayer.name = tgUser.first_name || 'Игрок';
+          if (tgUser.username) {
+            currentPlayer.name = '@' + tgUser.username;
+          }
         }
         Telegram.WebApp.expand();
-      } else {
-        currentPlayer.name = prompt('Введите ваше имя:', 'Игрок') || 'Игрок';
       }
       
       updatePlayerUI();
@@ -266,23 +409,18 @@
     function placeBet() {
       const amount = parseInt(betAmountInput.value);
       
-      if (isNaN(amount)) {
-        alert('Введите корректное количество монет!');
-        return;
-      }
-      
-      if (amount < 1) {
-        alert('Минимальная ставка - 1 монета!');
+      if (isNaN(amount) || amount < 1) {
+        showError('Минимальная ставка - 1 монета!');
         return;
       }
       
       if (amount > currentPlayer.balance) {
-        alert('Недостаточно монет!');
+        showError('Недостаточно монет!');
         return;
       }
       
       if (gameState.players[currentPlayer.id]) {
-        alert('Вы уже сделали ставку в этом раунде!');
+        showError('Вы уже сделали ставку!');
         return;
       }
       
@@ -310,7 +448,7 @@
       placeBetBtn.disabled = true;
       
       // Если игроков достаточно, начинаем обратный отсчет
-      if (Object.keys(gameState.players).length >= 1) {
+      if (Object.keys(gameState.players).length >= 2) {
         database.ref('game/countdown').set(5);
       }
     }
@@ -318,6 +456,7 @@
     function startCountdown() {
       let countdown = gameState.countdown;
       timer.textContent = countdown;
+      timer.style.animation = 'glow 0.5s infinite alternate';
       
       const countdownInterval = setInterval(() => {
         countdown--;
@@ -326,11 +465,15 @@
         if (countdown <= 0) {
           clearInterval(countdownInterval);
           database.ref('game/isSpinning').set(true);
+          timer.style.animation = 'none';
         }
       }, 1000);
     }
 
     function spinWheel() {
+      // Очищаем предыдущие сектора
+      wheel.innerHTML = '';
+      
       // Рассчитываем углы для каждого игрока
       const players = Object.values(gameState.players);
       const totalBet = players.reduce((sum, player) => sum + player.bet, 0);
@@ -338,7 +481,7 @@
       let lastAngle = 0;
       players.forEach(player => {
         const angle = (player.bet / totalBet) * 360;
-        createWheelSection(player.color, lastAngle, lastAngle + angle);
+        createWheelSection(player.color, lastAngle, lastAngle + angle, player.name);
         lastAngle += angle;
       });
       
@@ -346,11 +489,11 @@
       const spinAngle = 3600 + Math.random() * 360; // 10 полных оборотов + случайный угол
       wheel.style.transform = `rotate(${-spinAngle}deg)`;
       
-      // Через 5 секунд определяем победителя
+      // Через 4 секунды определяем победителя
       setTimeout(() => {
         const winningAngle = spinAngle % 360;
         determineWinner(winningAngle, players, totalBet);
-      }, 5000);
+      }, 4000);
     }
 
     function determineWinner(winningAngle, players, totalBet) {
@@ -380,10 +523,16 @@
         
         // Возвращаем кнопку ставки
         placeBetBtn.disabled = false;
+        
+        // Обновляем баланс победителя
+        if (winner && winner.id === currentPlayer.id) {
+          currentPlayer.balance += gameState.totalPot;
+          updatePlayerUI();
+        }
       }, 5000);
     }
 
-    function createWheelSection(color, startAngle, endAngle) {
+    function createWheelSection(color, startAngle, endAngle, playerName) {
       const section = document.createElement('div');
       section.className = 'wheel-section';
       section.style.backgroundColor = color;
@@ -391,7 +540,11 @@
       section.style.clipPath = `polygon(0 0, 100% 0, 100% 100%)`;
       
       const percentage = Math.round(((endAngle - startAngle) / 360) * 100);
-      section.textContent = `${percentage}%`;
+      section.innerHTML = `
+        <div style="transform:rotate(${45 - (startAngle + (endAngle - startAngle)/2)}deg)">
+          ${playerName}<br>${percentage}%
+        </div>
+      `;
       
       wheel.appendChild(section);
     }
@@ -401,7 +554,10 @@
       betsList.innerHTML = '';
       Object.values(gameState.players).forEach(player => {
         const betItem = document.createElement('div');
-        betItem.innerHTML = `<span style="color:${player.color}">${player.name}</span>: ${player.bet} монет`;
+        betItem.innerHTML = `
+          <span style="color:${player.color}">■</span> 
+          ${player.name}: ${player.bet} монет (${Math.round((player.bet / gameState.totalPot) * 100)}%)
+        `;
         betsList.appendChild(betItem);
       });
       
@@ -415,7 +571,12 @@
       
       if (otherPlayersList.length > 0) {
         otherPlayers.innerHTML = otherPlayersList
-          .map(player => `<div><span class="player-color" style="background:${player.color}"></span>${player.name}: ${player.bet} монет</div>`)
+          .map(player => `
+            <div>
+              <span class="player-color" style="background:${player.color}"></span>
+              ${player.name}: ${player.bet} монет
+            </div>
+          `)
           .join('');
       } else {
         otherPlayers.textContent = 'Ожидание игроков...';
@@ -431,11 +592,12 @@
       // Показываем победителя
       if (gameState.winner) {
         timer.textContent = `Победитель: ${gameState.winner.name}`;
+        timer.style.color = gameState.winner.color;
+        timer.style.textShadow = `0 0 10px ${gameState.winner.color}`;
         
-        // Если это текущий игрок, обновляем баланс
+        // Если это текущий игрок, показываем анимацию
         if (gameState.winner.id === currentPlayer.id) {
-          currentPlayer.balance += gameState.totalPot;
-          updatePlayerUI();
+          timer.style.animation = 'glow 0.5s infinite alternate';
         }
       }
     }
@@ -443,6 +605,17 @@
     function updatePlayerUI() {
       yourBalance.textContent = `${currentPlayer.balance} монет`;
       betAmountInput.max = Math.min(currentPlayer.balance, 100);
+    }
+
+    function showError(message) {
+      timer.textContent = message;
+      timer.style.color = '#ff5252';
+      timer.style.textShadow = '0 0 10px #ff5252';
+      setTimeout(() => {
+        timer.textContent = '';
+        timer.style.color = '';
+        timer.style.textShadow = '';
+      }, 2000);
     }
 
     // Вспомогательные функции
