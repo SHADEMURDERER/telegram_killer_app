@@ -142,8 +142,8 @@ body {
   border-left: 3px solid #7f5af0;
 }
 
-/* PVP Wheel Styles */
-#pvp-wheel-container {
+/* PVP Bar Styles */
+#pvp-container {
   display: none;
   position: fixed;
   top: 0;
@@ -157,49 +157,44 @@ body {
   flex-direction: column;
 }
 
-#wheel {
-  width: 300px;
-  height: 300px;
-  border-radius: 50%;
-  position: relative;
+#progress-bar {
+  width: 80%;
+  max-width: 400px;
+  height: 40px;
+  background: #3a3836;
+  border-radius: 20px;
   overflow: hidden;
-  border: 5px solid #3a3836;
-  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+  position: relative;
+  margin: 20px 0;
 }
 
-.wheel-segment {
-  position: absolute;
+#progress-fill {
+  height: 100%;
   width: 50%;
-  height: 50%;
-  transform-origin: bottom right;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
+  background: linear-gradient(90deg, #FF5252 0%, #4FC3F7 100%);
+  transition: width 0.3s;
 }
 
-.wheel-pointer {
+#progress-pointer {
   position: absolute;
-  top: 10px;
+  top: -10px;
   left: 50%;
   transform: translateX(-50%);
   width: 0;
   height: 0;
   border-left: 15px solid transparent;
   border-right: 15px solid transparent;
-  border-top: 30px solid #7f5af0;
-  z-index: 10;
+  border-top: 20px solid #7f5af0;
 }
 
-#wheel-result {
-  margin-top: 20px;
+#pvp-result {
+  margin: 20px 0;
   font-size: 1.5rem;
   color: #7f5af0;
   text-shadow: 0 0 8px #7f5af0;
 }
 
 #pvp-bet {
-  margin-top: 20px;
   padding: 10px 20px;
   background: #7f5af0;
   color: white;
@@ -207,12 +202,36 @@ body {
   border-radius: 10px;
   font-size: 1.2rem;
   cursor: pointer;
+  margin-top: 20px;
 }
 
-#pvp-chance {
-  margin-top: 10px;
-  font-size: 1.1rem;
+#pvp-status {
+  margin-bottom: 20px;
+  font-size: 1.2rem;
 }
+
+.player-info {
+  display: flex;
+  justify-content: space-between;
+  width: 80%;
+  max-width: 400px;
+  margin-bottom: 10px;
+}
+
+.player {
+  display: flex;
+  align-items: center;
+}
+
+.player-color {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  margin-right: 10px;
+}
+
+#player1-color { background: #FF5252; }
+#player2-color { background: #4FC3F7; }
 </style>
 </head>
 <body>
@@ -228,7 +247,7 @@ body {
     <div class="tab-buttons">
       <button class="tab-button active" onclick="switchTab('profile')">Профиль</button>
       <button class="tab-button" onclick="switchTab('shop')">Магазин</button>
-      <button class="tab-button" onclick="openPvpWheel()">PVP</button>
+      <button class="tab-button" onclick="openPvpGame()">PVP</button>
     </div>
     
     <div id="profile" class="tab-content active">
@@ -249,34 +268,61 @@ body {
   </div>
 </div>
 
-<div id="pvp-wheel-container">
-  <div id="wheel">
-    <div class="wheel-pointer"></div>
+<div id="pvp-container">
+  <div id="pvp-status">Ожидание игроков...</div>
+  
+  <div class="player-info">
+    <div class="player">
+      <div class="player-color" id="player1-color"></div>
+      <span id="player1-name">Вы</span>
+    </div>
+    <div class="player">
+      <div class="player-color" id="player2-color"></div>
+      <span id="player2-name">Соперник</span>
+    </div>
   </div>
-  <div id="wheel-result"></div>
-  <div id="pvp-chance">Шанс победы: 50%</div>
+  
+  <div id="progress-bar">
+    <div id="progress-fill"></div>
+    <div id="progress-pointer"></div>
+  </div>
+  
+  <div id="pvp-result"></div>
   <button id="pvp-bet" onclick="placeBet()">Сделать ставку (50 золотых)</button>
 </div>
 
 <script>
 // Глобальные переменные
-let playerId = Math.random().toString(36).substring(2, 15);
+let currentPlayer = {
+  id: null,
+  name: 'Игрок'
+};
 let gameState = {
   player1: null,
   player2: null,
-  spinning: false
+  spinning: false,
+  lastUpdate: 0,
+  winner: null
 };
 
 // Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', () => {
+  // Инициализация Telegram WebApp
   if (window.Telegram && Telegram.WebApp) {
     const user = Telegram.WebApp.initDataUnsafe.user;
-    if (user?.first_name) {
-      document.getElementById('username').textContent = user.first_name;
+    if (user?.id) {
+      currentPlayer.id = 'tg_' + user.id;
+      currentPlayer.name = user.first_name || 'Игрок';
+      document.getElementById('username').textContent = currentPlayer.name;
     }
     Telegram.WebApp.expand();
+  } else {
+    // Для тестирования без Telegram
+    currentPlayer.id = 'local_' + Math.random().toString(36).substring(2, 9);
+    currentPlayer.name = 'Игрок';
   }
   
+  // Инициализация UI
   const elements = document.querySelectorAll('#ring, #title, #panel');
   elements.forEach(el => {
     el.style.willChange = 'transform, opacity, filter';
@@ -314,146 +360,205 @@ function switchTab(tabName) {
   event.target.classList.add('active');
 }
 
-// PVP Wheel Logic
-function openPvpWheel() {
-  document.getElementById('pvp-wheel-container').style.display = 'flex';
-  updateWheelUI();
-}
-
-function closePvpWheel() {
-  document.getElementById('pvp-wheel-container').style.display = 'none';
+// PVP Game Logic
+function openPvpGame() {
+  document.getElementById('pvp-container').style.display = 'flex';
+  updateGameUI();
 }
 
 function loadGameState() {
-  const savedState = localStorage.getItem('pvpWheelState');
+  const savedState = localStorage.getItem('pvpGameState');
   if (savedState) {
-    gameState = JSON.parse(savedState);
+    const parsedState = JSON.parse(savedState);
+    
+    // Проверяем, не устарело ли состояние (больше 2 минут)
+    if (Date.now() - parsedState.lastUpdate < 120000) {
+      gameState = parsedState;
+    } else {
+      resetGameState();
+    }
   }
-  updateWheelUI();
 }
 
 function saveGameState() {
-  localStorage.setItem('pvpWheelState', JSON.stringify(gameState));
+  gameState.lastUpdate = Date.now();
+  localStorage.setItem('pvpGameState', JSON.stringify(gameState));
+}
+
+function resetGameState() {
+  gameState = {
+    player1: null,
+    player2: null,
+    spinning: false,
+    lastUpdate: Date.now(),
+    winner: null
+  };
+  saveGameState();
 }
 
 function checkGameState() {
   const oldState = JSON.stringify(gameState);
   loadGameState();
   
-  if (gameState.spinning) {
-    // Игра уже идет, обновляем UI
-    updateWheelUI();
-    return;
-  }
-  
-  if (gameState.player1 && gameState.player2 && !gameState.spinning) {
-    // Оба игрока сделали ставки - запускаем колесо
-    startSpinning();
-  }
-  
+  // Если состояние изменилось, обновляем UI
   if (JSON.stringify(gameState) !== oldState) {
-    updateWheelUI();
+    updateGameUI();
+  }
+  
+  // Если оба игрока на месте, но игра не началась
+  if (gameState.player1 && gameState.player2 && !gameState.spinning) {
+    // Проверяем, что оба игрока разные
+    if (gameState.player1.id !== gameState.player2.id) {
+      startGame();
+    } else {
+      // Если это один и тот же игрок, сбрасываем игру
+      resetGameState();
+    }
   }
 }
 
-function updateWheelUI() {
-  const wheel = document.getElementById('wheel');
+function updateGameUI() {
   const betButton = document.getElementById('pvp-bet');
+  const statusElement = document.getElementById('pvp-status');
+  const resultElement = document.getElementById('pvp-result');
+  const progressFill = document.getElementById('progress-fill');
   
-  wheel.innerHTML = '<div class="wheel-pointer"></div>';
-  
-  // Проверяем, сделал ли текущий игрок ставку
-  const isPlayer1 = gameState.player1 === playerId;
-  const isPlayer2 = gameState.player2 === playerId;
-  const hasBet = isPlayer1 || isPlayer2;
-  
-  if (gameState.player1 || gameState.player2) {
-    const segments = gameState.player1 && gameState.player2 ? 2 : 1;
-    const angle = 360 / segments;
-    
-    for (let i = 0; i < segments; i++) {
-      const segment = document.createElement('div');
-      segment.className = 'wheel-segment';
-      segment.style.transform = `rotate(${angle * i}deg)`;
-      segment.style.backgroundColor = i === 0 ? '#FF5252' : '#4FC3F7';
-      wheel.appendChild(segment);
-    }
+  // Сбрасываем результат, если игра не завершена
+  if (!gameState.winner) {
+    resultElement.textContent = '';
   }
   
+  // Определяем, участвует ли текущий игрок в игре
+  const isPlayer1 = gameState.player1 && gameState.player1.id === currentPlayer.id;
+  const isPlayer2 = gameState.player2 && gameState.player2.id === currentPlayer.id;
+  const isInGame = isPlayer1 || isPlayer2;
+  
   if (gameState.spinning) {
+    // Игра уже идет
     betButton.disabled = true;
-    betButton.textContent = 'Колесо крутится...';
-    document.getElementById('pvp-chance').textContent = 'Идет игра...';
-  } else if (gameState.player1 && gameState.player2) {
-    betButton.disabled = hasBet;
-    betButton.textContent = hasBet ? 'Ожидание запуска...' : 'Присоединиться к игре';
-    document.getElementById('pvp-chance').textContent = 'Шанс победы: 50% / 50%';
+    betButton.textContent = 'Идет игра...';
+    statusElement.textContent = 'Идет игра...';
+    progressFill.style.width = '100%';
+    progressFill.style.background = 'linear-gradient(90deg, #FF5252 0%, #4FC3F7 100%)';
+    return;
+  }
+  
+  // Обновляем информацию об игроках
+  if (gameState.player1) {
+    document.getElementById('player1-name').textContent = 
+      gameState.player1.id === currentPlayer.id ? 'Вы' : gameState.player1.name;
+  } else {
+    document.getElementById('player1-name').textContent = 'Ожидание...';
+  }
+  
+  if (gameState.player2) {
+    document.getElementById('player2-name').textContent = 
+      gameState.player2.id === currentPlayer.id ? 'Вы' : gameState.player2.name;
+  } else {
+    document.getElementById('player2-name').textContent = 'Ожидание...';
+  }
+  
+  // Обновляем UI кнопки и статуса
+  if (gameState.player1 && gameState.player2) {
+    // Оба игрока на месте
+    if (isInGame) {
+      betButton.disabled = true;
+      betButton.textContent = 'Ожидание запуска...';
+      statusElement.textContent = 'Оба игрока готовы!';
+    } else {
+      betButton.disabled = true;
+      betButton.textContent = 'Игра уже началась';
+      statusElement.textContent = 'Игра в процессе';
+    }
+    progressFill.style.width = '100%';
+    progressFill.style.background = 'linear-gradient(90deg, #FF5252 0%, #4FC3F7 100%)';
   } else if (gameState.player1 || gameState.player2) {
-    if (hasBet) {
+    // Только один игрок
+    if (isInGame) {
       betButton.disabled = true;
       betButton.textContent = 'Ожидание соперника...';
-      document.getElementById('pvp-chance').textContent = 'Шанс победы: 100% (ждем второго игрока)';
+      statusElement.textContent = 'Ожидание второго игрока';
+      progressFill.style.width = '50%';
+      progressFill.style.background = isPlayer1 ? '#FF5252' : '#4FC3F7';
     } else {
       betButton.disabled = false;
       betButton.textContent = 'Присоединиться (50 золотых)';
-      document.getElementById('pvp-chance').textContent = 'Шанс победы: 50%';
+      statusElement.textContent = 'Можно присоединиться';
+      progressFill.style.width = gameState.player1 ? '50%' : '0%';
+      progressFill.style.background = '#FF5252';
     }
   } else {
+    // Нет игроков
     betButton.disabled = false;
     betButton.textContent = 'Создать игру (50 золотых)';
-    document.getElementById('pvp-chance').textContent = 'Шанс победы: 50%';
+    statusElement.textContent = 'Ожидание игроков...';
+    progressFill.style.width = '0%';
   }
 }
 
 function placeBet() {
   if (gameState.spinning) return;
   
+  // Если игрок уже в игре, ничего не делаем
+  if ((gameState.player1 && gameState.player1.id === currentPlayer.id) || 
+      (gameState.player2 && gameState.player2.id === currentPlayer.id)) {
+    return;
+  }
+  
   if (!gameState.player1) {
-    gameState.player1 = playerId;
-  } else if (!gameState.player2 && gameState.player1 !== playerId) {
-    gameState.player2 = playerId;
+    gameState.player1 = currentPlayer;
+  } else if (!gameState.player2 && gameState.player1.id !== currentPlayer.id) {
+    gameState.player2 = currentPlayer;
   }
   
   saveGameState();
-  updateWheelUI();
+  updateGameUI();
 }
 
-function startSpinning() {
+function startGame() {
   gameState.spinning = true;
   saveGameState();
   
-  const wheel = document.getElementById('wheel');
-  const result = document.getElementById('wheel-result');
+  const betButton = document.getElementById('pvp-bet');
+  const statusElement = document.getElementById('pvp-status');
+  const resultElement = document.getElementById('pvp-result');
+  const progressFill = document.getElementById('progress-fill');
   
-  result.textContent = '';
+  betButton.disabled = true;
+  statusElement.textContent = 'Определяем победителя...';
   
-  const spinDuration = 3000;
-  const spins = 5;
-  const finalAngle = Math.floor(Math.random() * 360);
-  const totalRotation = spins * 360 + finalAngle;
-  
-  wheel.style.transition = `transform ${spinDuration}ms cubic-bezier(0.17, 0.67, 0.21, 0.99)`;
-  wheel.style.transform = `rotate(${totalRotation}deg)`;
-  
-  setTimeout(() => {
-    const winningSegment = (360 - (finalAngle % 360)) < 180 ? 0 : 1;
-    const winner = winningSegment === 0 ? 'Игрок 1' : 'Игрок 2';
-    result.textContent = `Победитель: ${winner}!`;
+  // Анимация прогресс-бара
+  let progress = 0;
+  const interval = setInterval(() => {
+    progress += 2;
+    progressFill.style.width = progress + '%';
     
-    setTimeout(() => {
-      // Сброс игры
-      gameState.player1 = null;
-      gameState.player2 = null;
-      gameState.spinning = false;
-      saveGameState();
-      
-      wheel.style.transition = 'none';
-      wheel.style.transform = 'rotate(0deg)';
-      setTimeout(() => {
-        updateWheelUI();
-      }, 10);
-    }, 3000);
-  }, spinDuration);
+    if (progress >= 100) {
+      clearInterval(interval);
+      finishGame();
+    }
+  }, 50);
+}
+
+function finishGame() {
+  // Определяем победителя (50/50)
+  const isPlayer1Winner = Math.random() < 0.5;
+  gameState.winner = isPlayer1Winner ? gameState.player1 : gameState.player2;
+  
+  const resultElement = document.getElementById('pvp-result');
+  const isWinner = gameState.winner.id === currentPlayer.id;
+  
+  resultElement.textContent = isWinner ? 'Вы победили! +50 золотых' : 'Вы проиграли!';
+  resultElement.style.color = isWinner ? '#4CAF50' : '#F44336';
+  
+  // Обновляем UI
+  updateGameUI();
+  
+  // Через 5 секунд сбрасываем игру
+  setTimeout(() => {
+    resetGameState();
+    updateGameUI();
+  }, 5000);
 }
 </script>
 </body>
