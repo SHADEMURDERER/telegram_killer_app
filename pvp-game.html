@@ -16,11 +16,11 @@
   <div class="player-info">
     <div class="player">
       <div class="player-color" id="player1-color"></div>
-      <span id="player1-name">Вы</span>
+      <span id="player1-name">Ожидание...</span>
     </div>
     <div class="player">
       <div class="player-color" id="player2-color"></div>
-      <span id="player2-name">Соперник</span>
+      <span id="player2-name">Ожидание...</span>
     </div>
   </div>
   
@@ -30,20 +30,10 @@
   </div>
   
   <div id="pvp-result"></div>
-  <button id="pvp-bet" onclick="placeBet()">Сделать ставку (50 золотых)</button>
+  <button id="pvp-bet">Сделать ставку (50 золотых)</button>
 </div>
 
 <script src="scripts/main.js"></script>
 <script src="scripts/pvp-game.js"></script>
-<!-- pvp-game.html - ОБНОВЛЕННАЯ СЕКЦИЯ СКРИПТА -->
-<script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
-    databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
-  };
-  
-  const app = firebase.initializeApp(firebaseConfig);
-  window.db = firebase.getDatabase(app);
-</script>
 </body>
 </html>

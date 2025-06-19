@@ -14,12 +14,18 @@ function initTelegram() {
       if (document.getElementById('username')) {
         document.getElementById('username').textContent = currentPlayer.name;
       }
+      
+      // Инициализируем кнопку Telegram
+      Telegram.WebApp.expand();
+      Telegram.WebApp.MainButton.setText("Продолжить").show();
     }
-    Telegram.WebApp.expand();
   } else {
     currentPlayer.id = 'local_' + Math.random().toString(36).substring(2, 9);
     currentPlayer.name = 'Игрок';
   }
+  
+  // Сохраняем игрока в глобальной области видимости
+  window.currentPlayer = currentPlayer;
 }
 
 // Переключение вкладок
