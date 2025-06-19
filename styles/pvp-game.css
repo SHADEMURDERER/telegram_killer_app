@@ -1,68 +1,257 @@
 #pvp-container {
-  max-width: 400px;
+  max-width: 800px;
   margin: 0 auto;
   padding: 20px;
-  text-align: center;
   font-family: Arial, sans-serif;
   color: white;
+  min-height: calc(100vh - 150px);
 }
 
-.players {
+.header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 30px 0;
+  margin-bottom: 30px;
 }
 
-.player {
-  flex: 1;
-}
-
-.avatar {
-  font-size: 50px;
-  margin-bottom: 10px;
-}
-
-.vs {
-  font-size: 30px;
-  font-weight: bold;
-  margin: 0 20px;
-}
-
-#action-button {
+.create-btn {
   background: #7f5af0;
   color: white;
   border: none;
-  padding: 12px 25px;
-  font-size: 18px;
-  border-radius: 10px;
+  padding: 10px 20px;
+  border-radius: 5px;
   cursor: pointer;
-  margin-top: 20px;
-  transition: all 0.3s;
+  font-size: 1rem;
+  transition: background 0.3s;
 }
 
-#action-button:hover {
+.create-btn:hover {
   background: #6a4ac9;
 }
 
-#action-button:disabled {
-  background: #555;
-  cursor: not-allowed;
+#rooms-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.room-card {
+  background: rgba(58, 56, 54, 0.7);
+  border-radius: 10px;
+  padding: 15px;
+  cursor: pointer;
+  transition: all 0.3s;
+  border-left: 3px solid #7f5af0;
+}
+
+.room-card:hover {
+  background: rgba(58, 56, 54, 0.9);
+  transform: translateY(-3px);
+}
+
+.room-card h3 {
+  margin-top: 0;
+  color: #7f5af0;
+}
+
+.room-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.empty-message {
+  text-align: center;
+  grid-column: 1 / -1;
+  padding: 40px 0;
+  color: #777;
+}
+
+#room-details {
+  background: rgba(42, 40, 38, 0.9);
+  border-radius: 15px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+#players-list {
+  margin: 20px 0;
+}
+
+.player-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: rgba(58, 56, 54, 0.5);
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.player-status {
+  font-size: 1.2rem;
+}
+
+.ready-btn {
+  background: #4CAF50;
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-right: 10px;
+  transition: background 0.3s;
+}
+
+.ready-btn:hover {
+  background: #3e8e41;
+}
+
+.leave-btn {
+  background: #F44336;
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.3s;
+}
+
+.leave-btn:hover {
+  background: #d32f2f;
 }
 
 #game-status {
-  margin: 20px 0;
-  font-size: 18px;
-  min-height: 27px;
-}
-
-#result {
-  font-size: 20px;
   margin-top: 20px;
-  min-height: 27px;
-  font-weight: bold;
+  padding: 15px;
+  background: rgba(127, 90, 240, 0.2);
+  border-radius: 8px;
+  text-align: center;
 }
 
-body {
+/* Модальное окно */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
   background: #2a2826;
+  padding: 25px;
+  border-radius: 15px;
+  width: 90%;
+  max-width: 400px;
+  border: 1px solid #3a3836;
+}
+
+.modal h3 {
+  margin-top: 0;
+  color: #7f5af0;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 10px;
+  background: #3a3836;
+  border: 1px solid #4a4846;
+  border-radius: 5px;
+  color: white;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal-buttons button {
+  padding: 10px 20px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+}
+
+.modal-buttons button:first-child {
+  background: #7f5af0;
+  color: white;
+}
+
+.modal-buttons button:last-child {
+  background: #555;
+  color: white;
+}
+
+/* Анимации */
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+.ready-status {
+  color: #4CAF50;
+  animation: pulse 1.5s infinite;
+}
+
+.not-ready-status {
+  color: #F44336;
+}
+
+/* Нижняя панель */
+#panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(42, 40, 38, 0.97);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid #3a3836;
+  padding: 15px 0;
+  z-index: 1000;
+}
+
+.tab-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 25px;
+}
+
+.tab-button {
+  background: none;
+  border: none;
+  color: white;
+  padding: 10px 20px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.tab-button.active {
+  color: #7f5af0;
+  text-shadow: 0 0 8px rgba(127, 90, 240, 0.5);
 }
