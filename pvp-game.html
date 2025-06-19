@@ -29,6 +29,8 @@
     </div>
     <div id="game-status"></div>
   </div>
+  
+  <div id="version">Build 1.1v (Room System)</div>
 </div>
 
 <!-- Нижнее меню -->
@@ -47,8 +49,15 @@ const firebaseConfig = {
   databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
 };
 
-const app = firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+// Проверка инициализации Firebase
+let app;
+let db;
+try {
+  app = firebase.initializeApp(firebaseConfig);
+  db = firebase.database();
+} catch (e) {
+  console.error("Firebase initialization error:", e);
+}
 
 // Текущий игрок
 const currentPlayer = {
@@ -73,14 +82,29 @@ const leaveRoomBtn = document.getElementById('leave-room-btn');
 
 // Инициализация
 function initPVPRoomSystem() {
+  if (!firebase.apps.length) {
+    console.error("Firebase not initialized");
+    return;
+  }
+
   roomsRef = db.ref('rooms');
   
+  // Проверка существования ссылки
+  if (!roomsRef) {
+    console.error("Failed to get rooms reference");
+    return;
+  }
+
   createRoomBtn.addEventListener('click', showCreateRoomModal);
   readyBtn.addEventListener('click', toggleReadyStatus);
   leaveRoomBtn.addEventListener('click', leaveRoom);
   
   loadRooms();
-  roomsRef.on('value', updateRoomsList);
+  
+  // Добавляем обработчик ошибок
+  roomsRef.on('value', updateRoomsList, (error) => {
+    console.error("Firebase read failed:", error);
+  });
 }
 
 // Показать модальное окно создания комнаты
@@ -166,24 +190,24 @@ function loadRooms() {
 function updateRoomsList(snapshot) {
   roomsList.innerHTML = '';
   
-  const rooms = snapshot.val();
-  if (!rooms) {
+  if (!snapshot.exists()) {
     roomsList.innerHTML = '<div class="empty-message">Нет доступных комнат</div>';
     return;
   }
   
+  const rooms = snapshot.val();
   let hasAvailableRooms = false;
   
   Object.entries(rooms).forEach(([roomId, room]) => {
-    if (room.status === 'waiting' && Object.keys(room.players).length < room.maxPlayers) {
+    if (room && room.status === 'waiting' && Object.keys(room.players || {}).length < (room.maxPlayers || 2)) {
       hasAvailableRooms = true;
-      const playerCount = Object.keys(room.players).length;
+      const playerCount = Object.keys(room.players || {}).length;
       
       const roomCard = document.createElement('div');
       roomCard.className = 'room-card';
       roomCard.innerHTML = `
-        <h3>${room.name}</h3>
-        <p>Игроков: ${playerCount}/${room.maxPlayers}</p>
+        <h3>${room.name || 'Без названия'}</h3>
+        <p>Игроков: ${playerCount}/${room.maxPlayers || 2}</p>
         <div class="room-meta">
           <span>${formatTime(room.createdAt)}</span>
           <span>${getRoomStatus(room)}</span>
@@ -213,9 +237,13 @@ function joinRoom(roomId) {
   currentRoomRef.transaction(room => {
     if (!room) return null;
     
-    if (Object.keys(room.players).length >= room.maxPlayers) {
+    if (Object.keys(room.players || {}).length >= (room.maxPlayers || 2)) {
       alert("Комната уже заполнена");
       return;
+    }
+    
+    if (!room.players) {
+      room.players = {};
     }
     
     if (!room.players[currentPlayer.id]) {
@@ -243,7 +271,6 @@ function setupRoomListeners() {
   currentRoomRef.on('value', snapshot => {
     const room = snapshot.val();
     if (!room) {
-      // Комната была удалена
       currentRoomId = null;
       currentRoomRef = null;
       hideRoomDetails();
@@ -252,10 +279,11 @@ function setupRoomListeners() {
     
     updateRoomDetails(room);
     
-    // Проверка готовности всех игроков
     if (room.status === 'waiting' && allPlayersReady(room)) {
       startGame();
     }
+  }, (error) => {
+    console.error("Firebase room listener error:", error);
   });
 }
 
@@ -275,14 +303,14 @@ function hideRoomDetails() {
 
 // Обновить детали комнаты
 function updateRoomDetails(room) {
-  roomName.textContent = room.name;
+  roomName.textContent = room.name || 'Без названия';
   playersList.innerHTML = '';
   
-  Object.entries(room.players).forEach(([playerId, player]) => {
+  Object.entries(room.players || {}).forEach(([playerId, player]) => {
     const playerItem = document.createElement('div');
     playerItem.className = 'player-item';
     playerItem.innerHTML = `
-      <span>${player.name} ${playerId === currentPlayer.id ? '(Вы)' : ''}</span>
+      <span>${player.name || 'Игрок'} ${playerId === currentPlayer.id ? '(Вы)' : ''}</span>
       <span class="player-status ${player.ready ? 'ready-status">✓' : 'not-ready-status">✗'}</span>
     `;
     playersList.appendChild(playerItem);
@@ -316,14 +344,13 @@ function toggleReadyStatus() {
 
 // Все ли игроки готовы
 function allPlayersReady(room) {
-  return Object.values(room.players).every(player => player.ready);
+  return Object.values(room.players || {}).every(player => player.ready);
 }
 
 // Начать игру
 function startGame() {
   currentRoomRef.update({ status: 'playing' })
     .then(() => {
-      // Симуляция игры
       setTimeout(() => {
         finishGame();
       }, 3000);
@@ -340,7 +367,9 @@ function finishGame() {
       const room = snapshot.val();
       if (!room) return;
       
-      const players = Object.keys(room.players);
+      const players = Object.keys(room.players || {});
+      if (players.length === 0) return;
+      
       const winnerId = players[Math.floor(Math.random() * players.length)];
       
       return currentRoomRef.update({
@@ -360,11 +389,10 @@ function leaveRoom() {
   
   currentRoomRef.child(`players/${currentPlayer.id}`).remove()
     .then(() => {
-      // Если комната пустая, удаляем её
       currentRoomRef.once('value')
         .then(snapshot => {
           const room = snapshot.val();
-          if (room && Object.keys(room.players).length === 0) {
+          if (room && Object.keys(room.players || {}).length === 0) {
             currentRoomRef.remove();
           }
         });
@@ -387,6 +415,7 @@ function formatTime(timestamp) {
 }
 
 function getRoomStatus(room) {
+  if (!room) return 'Неизвестно';
   if (room.status === 'playing') return 'Игра идет';
   if (room.status === 'finished') return 'Завершена';
   return 'Ожидание';
