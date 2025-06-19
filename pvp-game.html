@@ -59,43 +59,59 @@ if (!elements.button || !elements.status || !elements.result) {
 } else {
   // 2. Инициализация Firebase
   const firebaseConfig = {
-    apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
-    databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
-  };
+  apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
+  databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
+};
 
-  try {
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+try {
+  const app = firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-    // 3. Обработчик кнопки с защитой от ошибок
-    elements.button.addEventListener('click', async () => {
-      try {
-        elements.button.disabled = true;
-        elements.status.textContent = "Создаём игру...";
-        
-        // Тест записи
-        await db.ref('connection_test').set({ timestamp: Date.now() });
-        
-        // Создаем игру
-        const newGameRef = db.ref('games').push();
-        await newGameRef.set({
-          player1: { id: 'test_id', name: 'Тестовый игрок' },
-          status: 'waiting'
-        });
+  // Проверка подключения
+  db.ref('.info/connected').on('value', (snap) => {
+    if (snap.val() === true) {
+      console.log("Firebase подключён!");
+    } else {
+      console.error("Нет подключения к Firebase");
+    }
+  });
 
-        elements.status.textContent = "Ожидаем соперника...";
-        console.log("Игра создана, ID:", newGameRef.key);
-      } catch (error) {
-        console.error("Ошибка Firebase:", error);
-        elements.status.textContent = "Ошибка: " + error.message;
-        elements.button.disabled = false;
-      }
-    });
+  document.getElementById('action-button').addEventListener('click', async () => {
+    const button = document.getElementById('action-button');
+    button.disabled = true;
+    
+    try {
+      // Тест записи (должен работать после обновления правил)
+      await db.ref('test_connection').set({ 
+        timestamp: Date.now(),
+        message: "Тест подключения"
+      });
 
-  } catch (error) {
-    console.error("Ошибка инициализации Firebase:", error);
-    elements.status.textContent = "Ошибка подключения к серверу";
-  }
+      // Создаём игру
+      const newGameRef = db.ref('games').push();
+      await newGameRef.set({
+        player1: {
+          id: 'player_' + Math.random().toString(36).slice(2, 9),
+          name: 'Игрок'
+        },
+        status: 'waiting',
+        createdAt: Date.now()
+      });
+
+      console.log("Игра создана! ID:", newGameRef.key);
+      document.getElementById('game-status').textContent = "Ожидаем соперника...";
+
+    } catch (error) {
+      console.error("Ошибка Firebase:", error);
+      alert("Ошибка: " + error.message);
+      button.disabled = false;
+    }
+  });
+
+} catch (error) {
+  console.error("Ошибка инициализации Firebase:", error);
+  document.getElementById('game-status').textContent = "Ошибка загрузки Firebase";
+}
 }
 </script>
 </body>
