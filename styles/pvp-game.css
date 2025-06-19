@@ -1,10 +1,19 @@
+body {
+  margin: 0;
+  padding: 0;
+  background: #2a2826;
+  color: white;
+  font-family: Arial, sans-serif;
+  min-height: 100vh;
+  position: relative;
+  padding-bottom: 80px;
+}
+
 #pvp-container {
   max-width: 800px;
   margin: 0 auto;
   padding: 20px;
-  font-family: Arial, sans-serif;
-  color: white;
-  min-height: calc(100vh - 150px);
+  min-height: calc(100vh - 160px);
 }
 
 .header {
@@ -226,32 +235,50 @@
   position: fixed;
   bottom: 0;
   left: 0;
-  width: 100%;
+  right: 0;
   background: rgba(42, 40, 38, 0.97);
   backdrop-filter: blur(12px);
-  border-top: 1px solid #3a3836;
   padding: 15px 0;
   z-index: 1000;
+  border-top: 1px solid #3a3836;
+  display: flex;
+  justify-content: center;
 }
 
 .tab-buttons {
   display: flex;
-  justify-content: center;
-  gap: 25px;
+  gap: 15px;
+  max-width: 500px;
+  width: 100%;
+  padding: 0 20px;
+  justify-content: space-between;
 }
 
 .tab-button {
   background: none;
   border: none;
   color: white;
-  padding: 10px 20px;
-  font-size: 1.1rem;
+  padding: 10px 15px;
+  font-size: 1rem;
   cursor: pointer;
-  position: relative;
-  transition: all 0.3s ease;
+  border-radius: 8px;
+  flex: 1;
+  text-align: center;
+  transition: all 0.3s;
+}
+
+.tab-button:hover {
+  background: rgba(127, 90, 240, 0.2);
 }
 
 .tab-button.active {
   color: #7f5af0;
-  text-shadow: 0 0 8px rgba(127, 90, 240, 0.5);
+  background: rgba(127, 90, 240, 0.1);
+}
+
+#version {
+  text-align: center;
+  margin-top: 20px;
+  color: #777;
+  font-size: 0.9rem;
 }
