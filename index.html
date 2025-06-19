@@ -127,12 +127,18 @@ body {
   padding: 8px 12px;
   background: rgba(58, 56, 54, 0.5);
   border-radius: 8px;
+  word-break: break-word;
 }
 
 .message-sender {
   font-weight: bold;
   color: #7f5af0;
   margin-right: 5px;
+}
+
+.your-message {
+  background: rgba(127, 90, 240, 0.2);
+  border-left: 3px solid #7f5af0;
 }
 
 .tab-content { 
@@ -203,6 +209,10 @@ body {
   100% { bottom: 30px; opacity: 1; }
 }
 </style>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -241,12 +251,34 @@ body {
 <div id="chat-container" class="chat-container">
   <div id="chat-messages" class="chat-messages"></div>
   <div class="chat-input">
-    <input type="text" id="message-input" placeholder="Введите сообщение...">
+    <input type="text" id="message-input" placeholder="Введите сообщение..." onkeypress="handleKeyPress(event)">
     <button onclick="sendMessage()">Отправить</button>
   </div>
 </div>
 
 <script>
+// Конфигурация Firebase (замените на свою!)
+const firebaseConfig = {
+  apiKey: "AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ12345678",
+  authDomain: "your-project-id.firebaseapp.com",
+  databaseURL: "https://your-project-id.firebaseio.com",
+  projectId: "your-project-id",
+  storageBucket: "your-project-id.appspot.com",
+  messagingSenderId: "123456789012",
+  appId: "1:123456789012:web:abcdefghijklmnopqrstuv"
+};
+
+// Инициализация Firebase
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+// Глобальные переменные
+let chatVisible = false;
+let currentUser = {
+  id: '',
+  name: 'Гость'
+};
+
 // Анимация кольца
 setTimeout(() => {
   document.getElementById('ring').style.animation = 'none';
@@ -261,11 +293,20 @@ setTimeout(() => {
 }, 4000);
 
 // Чат
-let chatVisible = false;
-
 function toggleChat() {
   chatVisible = !chatVisible;
   document.getElementById('chat-container').style.display = chatVisible ? 'flex' : 'none';
+  if (chatVisible) {
+    setTimeout(() => {
+      document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+    }, 100);
+  }
+}
+
+function handleKeyPress(e) {
+  if (e.key === 'Enter') {
+    sendMessage();
+  }
 }
 
 function sendMessage() {
@@ -273,21 +314,25 @@ function sendMessage() {
   const message = input.value.trim();
   
   if (message) {
-    addMessage('Вы', message);
-    input.value = '';
+    // Отправка сообщения в Firebase
+    database.ref('messages').push().set({
+      senderId: currentUser.id,
+      senderName: currentUser.name,
+      text: message,
+      timestamp: firebase.database.ServerValue.TIMESTAMP
+    });
     
-    // Эмуляция ответа (в реальном приложении - через WebSocket)
-    setTimeout(() => {
-      addMessage('Другой игрок', 'Привет! Как дела?');
-    }, 1000);
+    input.value = '';
   }
 }
 
-function addMessage(sender, text) {
+function addMessage(senderId, senderName, text) {
   const messages = document.getElementById('chat-messages');
   const messageElement = document.createElement('div');
-  messageElement.className = 'message';
-  messageElement.innerHTML = `<span class="message-sender">${sender}:</span> ${text}`;
+  
+  messageElement.className = `message ${senderId === currentUser.id ? 'your-message' : ''}`;
+  messageElement.innerHTML = `<span class="message-sender">${senderName}:</span> ${text}`;
+  
   messages.appendChild(messageElement);
   messages.scrollTop = messages.scrollHeight;
 }
@@ -307,16 +352,31 @@ function switchTab(tabName) {
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', () => {
-  addMessage('Система', 'Чат подключен');
-  
+  // Определяем пользователя
   if (window.Telegram && Telegram.WebApp) {
-    const user = Telegram.WebApp.initDataUnsafe.user;
-    if (user?.first_name) {
-      document.getElementById('username').textContent = user.first_name;
+    const tgUser = Telegram.WebApp.initDataUnsafe.user;
+    if (tgUser) {
+      currentUser = {
+        id: tgUser.id.toString(),
+        name: tgUser.first_name || 'Telegram User'
+      };
+      document.getElementById('username').textContent = currentUser.name;
     }
     Telegram.WebApp.expand();
+  } else {
+    // Для теста вне Telegram
+    currentUser = {
+      id: 'guest_' + Math.random().toString(36).substr(2, 9),
+      name: 'Гость'
+    };
   }
-  
+
+  // Загружаем историю сообщений
+  database.ref('messages').orderByChild('timestamp').limitToLast(50).on('child_added', (snapshot) => {
+    const msg = snapshot.val();
+    addMessage(msg.senderId, msg.senderName, msg.text);
+  });
+
   // Оптимизация анимаций
   const elements = document.querySelectorAll('#ring, #title, #panel, #chat-container');
   elements.forEach(el => {
