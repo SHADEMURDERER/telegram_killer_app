@@ -8,12 +8,12 @@ body {
   margin: 0;
   background: #000;
   color: white;
-  font-family: Arial;
+  font-family: 'Arial', sans-serif;
   height: 100vh;
   overflow: hidden;
 }
 
-/* Загрузочный экран */
+/* Анимация загрузки */
 #loading {
   position: fixed;
   top: 0;
@@ -23,14 +23,16 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  background: black;
-  z-index: 100;
+  background: #000;
+  z-index: 1000;
+  animation: fadeOut 1s ease-in-out 2s forwards;
 }
 
 #loading-text {
   font-size: 72px;
   font-weight: bold;
   text-shadow: 0 0 10px #0f0, 0 0 20px #0f0;
+  animation: pulse 1.5s infinite alternate, neonGlow 2s infinite alternate;
 }
 
 /* Основной интерфейс */
@@ -38,25 +40,46 @@ body {
   display: none;
   padding: 20px;
   height: calc(100vh - 80px);
+  animation: fadeIn 0.5s ease-out forwards;
 }
 
 .profile {
-  background: #222;
-  padding: 15px;
+  background: rgba(34, 34, 34, 0.9);
+  padding: 20px;
   border-radius: 10px;
   margin-bottom: 20px;
   border: 1px solid #0f0;
+  box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+  transform: translateY(20px);
+  opacity: 0;
+  animation: slideUp 0.5s ease-out 2.2s forwards;
 }
 
+.shop-item {
+  background: rgba(40, 40, 40, 0.9);
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  border-left: 3px solid #0f0;
+  transform: translateX(-20px);
+  opacity: 0;
+  animation: slideRight 0.4s ease-out forwards;
+}
+
+.shop-item:nth-child(1) { animation-delay: 2.4s; }
+.shop-item:nth-child(2) { animation-delay: 2.6s; }
+
+/* Меню */
 .menu {
   position: fixed;
   bottom: 0;
   left: 0;
   width: 100%;
   height: 60px;
-  background: #111;
+  background: rgba(17, 17, 17, 0.95);
   display: flex;
   border-top: 1px solid #0f0;
+  box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.5);
 }
 
 .menu-btn {
@@ -65,11 +88,78 @@ body {
   justify-content: center;
   align-items: center;
   cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.menu-btn::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 3px;
+  background: #0f0;
+  transition: all 0.3s ease;
+}
+
+.menu-btn:hover {
+  color: #0f0;
+  text-shadow: 0 0 8px #0f0;
+}
+
+.menu-btn:hover::after {
+  width: 100%;
+  left: 0;
 }
 
 .menu-btn.active {
   color: #0f0;
-  text-shadow: 0 0 5px #0f0;
+  text-shadow: 0 0 10px #0f0;
+}
+
+.menu-btn.active::after {
+  width: 100%;
+  left: 0;
+  background: #0f0;
+  box-shadow: 0 0 15px #0f0;
+}
+
+/* Анимации */
+@keyframes pulse {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.05); }
+}
+
+@keyframes neonGlow {
+  0% { text-shadow: 0 0 10px #0f0, 0 0 20px #0f0; }
+  100% { text-shadow: 0 0 15px #0f0, 0 0 30px #0f0, 0 0 45px #0f0; }
+}
+
+@keyframes fadeOut {
+  to { opacity: 0; visibility: hidden; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideRight {
+  from { transform: translateX(-20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* Эффект при переключении вкладок */
+@keyframes tabSwitch {
+  0% { opacity: 0; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
 }
 </style>
 </head>
@@ -83,63 +173,80 @@ body {
 <!-- Основное приложение -->
 <div id="app">
   <div class="profile">
-    <h2>Добро пожаловать, Воин!</h2>
-    <p>Ваш аккаунт: <span id="username">@BUshidoOoOoO</span></p>
+    <h2 style="margin-top:0;">Добро пожаловать, <span id="user-title">Воин</span>!</h2>
+    <p>Ваш аккаунт: <span id="username" style="color:#0f0;text-shadow:0 0 5px #0f0;">@BUshidoOoOoO</span></p>
   </div>
   
   <div id="shop" style="display:none">
-    <div style="background:#222;padding:15px;margin-bottom:10px;border-left:3px solid #0f0">
-      <h3>Меч Дракона</h3>
-      <p>Цена: 100 золотых</p>
+    <div class="shop-item">
+      <h3 style="margin:0 0 10px 0;">🗡️ Меч Дракона</h3>
+      <p style="margin:0;color:#0f0;">100 золотых</p>
+    </div>
+    <div class="shop-item">
+      <h3 style="margin:0 0 10px 0;">🛡️ Щит Рыцаря</h3>
+      <p style="margin:0;color:#0f0;">75 золотых</p>
     </div>
   </div>
 </div>
 
 <!-- Меню -->
 <div class="menu">
-  <div class="menu-btn active" onclick="showTab('profile')">Кабинет</div>
-  <div class="menu-btn" onclick="showTab('shop')">Магазин</div>
+  <div class="menu-btn active" onclick="showTab('profile')">🏠 Кабинет</div>
+  <div class="menu-btn" onclick="showTab('shop')">🛒 Магазин</div>
 </div>
 
 <script>
 // После полной загрузки страницы
 window.onload = function() {
-  // Скрываем загрузку через 2 секунды
-  setTimeout(function() {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
+  // Если в Telegram - получаем данные пользователя
+  if (window.Telegram && Telegram.WebApp) {
+    Telegram.WebApp.expand();
+    const user = Telegram.WebApp.initDataUnsafe.user;
     
-    // Если в Telegram - раскрываем на весь экран
-    if (window.Telegram && Telegram.WebApp) {
-      Telegram.WebApp.expand();
-      // Автоматически подставляем username
-      const user = Telegram.WebApp.initDataUnsafe.user;
-      if (user && user.username) {
+    if (user) {
+      if (user.first_name) {
+        document.getElementById('user-title').textContent = user.first_name;
+      }
+      if (user.username) {
         document.getElementById('username').textContent = '@' + user.username;
       }
     }
+  }
+  
+  // Показываем основной интерфейс после загрузки
+  setTimeout(function() {
+    document.getElementById('app').style.display = 'block';
   }, 2000);
 };
 
-// Переключение вкладок
+// Переключение вкладок с анимацией
 function showTab(tabName) {
-  // Убираем активность у всех кнопок
+  // Анимация кнопок меню
   document.querySelectorAll('.menu-btn').forEach(btn => {
     btn.classList.remove('active');
   });
-  
-  // Делаем активной текущую кнопку
   event.target.classList.add('active');
   
-  // Переключаем контент
+  // Анимация переключения контента
   if (tabName === 'profile') {
     document.getElementById('shop').style.display = 'none';
     document.querySelector('.profile').style.display = 'block';
+    document.querySelector('.profile').style.animation = 'tabSwitch 0.3s ease-out';
   } 
   else if (tabName === 'shop') {
     document.querySelector('.profile').style.display = 'none';
     document.getElementById('shop').style.display = 'block';
+    document.getElementById('shop').style.animation = 'tabSwitch 0.3s ease-out';
   }
+  
+  // Сбрасываем анимацию через короткое время
+  setTimeout(() => {
+    if (tabName === 'profile') {
+      document.querySelector('.profile').style.animation = '';
+    } else {
+      document.getElementById('shop').style.animation = '';
+    }
+  }, 300);
 }
 </script>
 </body>
