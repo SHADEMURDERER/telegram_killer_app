@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
   <meta charset="UTF-8">
-  <title>Gizmo PVP</title>
+  <title>Gizmo PVP (Комнаты)</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <style>
@@ -12,106 +12,121 @@
       font-family: Arial, sans-serif;
       text-align: center;
       padding: 20px;
-      margin: 0;
     }
-    #pvp-container {
-      max-width: 500px;
-      margin: 0 auto;
+    #room-id-input {
+      padding: 10px;
+      width: 200px;
+      margin-right: 10px;
     }
     #action-button {
       background: #7f5af0;
       color: white;
       border: none;
-      padding: 12px 25px;
-      font-size: 18px;
-      border-radius: 10px;
+      padding: 10px 20px;
+      border-radius: 5px;
       cursor: pointer;
-      margin: 20px 0;
-    }
-    #version {
-      color: #7f5af0;
-      font-size: 12px;
-      margin-top: 30px;
     }
   </style>
 </head>
 <body>
 
 <div id="pvp-container">
-  <h1>⚔️ PVP Арена</h1>
-  <div id="game-status">Нажмите кнопку ниже</div>
-  <button id="action-button">Начать бой (50💰)</button>
-  <div id="result"></div>
-  <div id="version">Build 0.4v (fixed null error)</div>
+  <h2>🎮 Комнаты PVP</h2>
+  <input type="text" id="room-id-input" placeholder="ID комнаты">
+  <button id="action-button">Присоединиться</button>
+  <div id="game-status"></div>
+  <div id="version">Build 1.0v (Room System)</div>
 </div>
 
 <script>
-// 1. Проверяем, что все DOM-элементы существуют
-const elements = {
-  button: document.getElementById('action-button'),
-  status: document.getElementById('game-status'),
-  result: document.getElementById('result')
-};
-
-if (!elements.button || !elements.status || !elements.result) {
-  console.error("Ошибка: Не найдены необходимые элементы DOM");
-  elements.status.textContent = "Ошибка загрузки интерфейса";
-} else {
-  // 2. Инициализация Firebase
-  const firebaseConfig = {
+// Конфиг Firebase
+const firebaseConfig = {
   apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
   databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
 };
 
-try {
-  const app = firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
+// Инициализация
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-  // Проверка подключения
-  db.ref('.info/connected').on('value', (snap) => {
-    if (snap.val() === true) {
-      console.log("Firebase подключён!");
-    } else {
-      console.error("Нет подключения к Firebase");
-    }
-  });
+// Глобальные переменные
+let currentRoomId = null;
+const currentPlayer = {
+  id: 'player_' + Math.random().toString(36).slice(2, 9),
+  name: 'Игрок'
+};
 
-  document.getElementById('action-button').addEventListener('click', async () => {
-    const button = document.getElementById('action-button');
-    button.disabled = true;
+// Обработчик кнопки
+document.getElementById('action-button').addEventListener('click', () => {
+  const roomId = document.getElementById('room-id-input').value.trim();
+  if (!roomId) return alert("Введите ID комнаты!");
+  
+  joinOrCreateRoom(roomId);
+});
+
+// Логика комнаты
+async function joinOrCreateRoom(roomId) {
+  const button = document.getElementById('action-button');
+  button.disabled = true;
+  document.getElementById('game-status').textContent = "Подключаемся...";
+
+  try {
+    const roomRef = db.ref('rooms/' + roomId);
+    const snapshot = await roomRef.once('value');
     
-    try {
-      // Тест записи (должен работать после обновления правил)
-      await db.ref('test_connection').set({ 
-        timestamp: Date.now(),
-        message: "Тест подключения"
+    if (!snapshot.exists()) {
+      // Создаем новую комнату
+      await roomRef.set({
+        player1: currentPlayer,
+        player2: null,
+        status: 'waiting'
       });
-
-      // Создаём игру
-      const newGameRef = db.ref('games').push();
-      await newGameRef.set({
-        player1: {
-          id: 'player_' + Math.random().toString(36).slice(2, 9),
-          name: 'Игрок'
-        },
-        status: 'waiting',
-        createdAt: Date.now()
+      document.getElementById('game-status').textContent = "Комната создана! Ожидаем соперника...";
+    } else {
+      // Присоединяемся к существующей
+      const room = snapshot.val();
+      if (room.player2) {
+        throw new Error("Комната уже заполнена");
+      }
+      
+      await roomRef.update({
+        player2: currentPlayer,
+        status: 'playing'
       });
+      document.getElementById('game-status').textContent = `Вы играете против ${room.player1.name}!`;
+    }
 
-      console.log("Игра создана! ID:", newGameRef.key);
-      document.getElementById('game-status').textContent = "Ожидаем соперника...";
+    currentRoomId = roomId;
+    startGameMonitoring(roomRef);
+    
+  } catch (error) {
+    console.error("Ошибка комнаты:", error);
+    alert("Ошибка: " + error.message);
+    button.disabled = false;
+  }
+}
 
-    } catch (error) {
-      console.error("Ошибка Firebase:", error);
-      alert("Ошибка: " + error.message);
-      button.disabled = false;
+// Мониторинг изменений в комнате
+function startGameMonitoring(roomRef) {
+  roomRef.on('value', (snapshot) => {
+    const room = snapshot.val();
+    if (!room) return;
+
+    if (room.status === 'playing' && room.player1 && room.player2) {
+      // Запуск игры
+      document.getElementById('game-status').textContent = "Игра началась!";
+      
+      setTimeout(() => {
+        const winner = Math.random() > 0.5 ? room.player1 : room.player2;
+        roomRef.update({ winner: winner.id, status: 'finished' });
+      }, 3000);
+    }
+
+    if (room.status === 'finished') {
+      document.getElementById('game-status').textContent = 
+        room.winner === currentPlayer.id ? "Вы победили!" : "Вы проиграли";
     }
   });
-
-} catch (error) {
-  console.error("Ошибка инициализации Firebase:", error);
-  document.getElementById('game-status').textContent = "Ошибка загрузки Firebase";
-}
 }
 </script>
 </body>
