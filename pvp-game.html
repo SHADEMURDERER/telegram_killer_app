@@ -5,35 +5,35 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
   <meta charset="UTF-8">
   <title>Gizmo PVP</title>
-  <link rel="stylesheet" href="styles/main.css">
   <link rel="stylesheet" href="styles/pvp-game.css">
 </head>
 <body>
 
 <div id="pvp-container">
-  <div id="pvp-status">Ожидание игроков...</div>
+  <h2>⚔️ PVP Арена</h2>
   
-  <div class="player-info">
+  <div class="players">
     <div class="player">
-      <div class="player-color" id="player1-color"></div>
-      <span id="player1-name">Ожидание...</span>
+      <div class="avatar" id="player1-avatar">👤</div>
+      <div class="name" id="player1-name">Ожидание...</div>
     </div>
+    
+    <div class="vs">VS</div>
+    
     <div class="player">
-      <div class="player-color" id="player2-color"></div>
-      <span id="player2-name">Ожидание...</span>
+      <div class="avatar" id="player2-avatar">👤</div>
+      <div class="name" id="player2-name">Ожидание...</div>
     </div>
   </div>
   
-  <div id="progress-bar">
-    <div id="progress-fill"></div>
-    <div id="progress-pointer"></div>
-  </div>
+  <div id="game-status">Нажмите "Начать бой"</div>
   
-  <div id="pvp-result"></div>
-  <button id="pvp-bet">Сделать ставку (50 золотых)</button>
+  <button id="action-button">Начать бой (50💰)</button>
+  
+  <div id="result"></div>
 </div>
 
-<script src="scripts/main.js"></script>
 <script src="scripts/pvp-game.js"></script>
+
 </body>
 </html>

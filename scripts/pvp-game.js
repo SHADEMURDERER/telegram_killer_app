@@ -1,222 +1,188 @@
-// pvp-game.js - ПОЛНОСТЬЮ ПЕРЕПИСАННЫЙ ФАЙЛ
-let gameRef = null;
+// Инициализация Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
+  databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
+};
+
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.getDatabase(app);
+
+// Текущий игрок
+const currentPlayer = {
+  id: Telegram?.WebApp?.initDataUnsafe?.user?.id || 'player_' + Math.random().toString(36).slice(2, 9),
+  name: Telegram?.WebApp?.initDataUnsafe?.user?.first_name || 'Игрок'
+};
+
 let currentGameId = null;
+let currentGameRef = null;
 
-// Инициализация PVP игры
-document.addEventListener('DOMContentLoaded', async () => {
-  document.getElementById('pvp-container').style.display = 'flex';
+// Элементы интерфейса
+const actionButton = document.getElementById('action-button');
+const gameStatus = document.getElementById('game-status');
+const resultDisplay = document.getElementById('result');
+const player1Name = document.getElementById('player1-name');
+const player2Name = document.getElementById('player2-name');
+
+// Основная функция инициализации
+async function initPVP() {
+  actionButton.addEventListener('click', handleActionButtonClick);
   
-  // Инициализация текущего игрока
-  window.currentPlayer = {
-    id: window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 'anon_' + Math.random().toString(36).slice(2),
-    name: window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || 'Игрок'
-  };
-
-  // Поиск активной игры при загрузке
-  await findActiveGame();
-});
-
-async function findActiveGame() {
-  const gamesRef = firebase.ref(db, 'games');
-  const snapshot = await firebase.get(gamesRef);
-  
-  if (snapshot.exists()) {
-    const games = snapshot.val();
-    
-    // Поиск игры, ожидающей второго игрока
-    const availableGame = Object.entries(games).find(([id, game]) => 
-      game.status === 'waiting' && 
-      game.player1.id !== currentPlayer.id
-    );
-    
-    if (availableGame) {
-      joinGame(availableGame[0], availableGame[1]);
-      return;
-    }
+  // Проверяем активные игры
+  const availableGame = await findAvailableGame();
+  if (availableGame) {
+    joinGame(availableGame);
+  } else {
+    updateUI('waiting');
   }
-  
-  updateUI('waiting');
 }
 
-function joinGame(gameId, gameData) {
-  currentGameId = gameId;
-  gameRef = firebase.ref(db, `games/${gameId}`);
+// Поиск доступной игры
+async function findAvailableGame() {
+  try {
+    const snapshot = await firebase.get(firebase.ref(db, 'games'));
+    if (snapshot.exists()) {
+      const games = snapshot.val();
+      return Object.entries(games).find(
+        ([id, game]) => game.status === 'waiting' && game.player1.id !== currentPlayer.id
+      );
+    }
+  } catch (error) {
+    console.error("Ошибка поиска игры:", error);
+  }
+  return null;
+}
+
+// Создание новой игры
+async function createGame() {
+  currentGameId = firebase.push(firebase.ref(db, 'games')).key;
+  currentGameRef = firebase.ref(db, `games/${currentGameId}`);
   
-  // Обновляем состояние игры
-  firebase.update(gameRef, {
-    player2: window.currentPlayer,
-    status: 'playing',
-    lastUpdate: Date.now()
+  await firebase.set(currentGameRef, {
+    player1: currentPlayer,
+    player2: null,
+    status: 'waiting',
+    createdAt: Date.now()
   });
   
   // Слушаем изменения в игре
-  firebase.onValue(gameRef, (snapshot) => {
+  firebase.onValue(currentGameRef, (snapshot) => {
     const game = snapshot.val();
     if (!game) return;
     
-    updateGameUI(game);
-    
-    if (game.status === 'playing' && game.player1 && game.player2) {
+    if (game.player2 && game.status === 'playing') {
       startGame(game);
     }
-  });
-  
-  updateUI('joined', gameData);
-}
-
-async function createGame() {
-  const newGameRef = firebase.push(firebase.ref(db, 'games'));
-  currentGameId = newGameRef.key;
-  gameRef = newGameRef;
-  
-  await firebase.set(newGameRef, {
-    player1: window.currentPlayer,
-    status: 'waiting',
-    createdAt: Date.now(),
-    lastUpdate: Date.now()
-  });
-  
-  // Слушаем нашу игру
-  firebase.onValue(newGameRef, (snapshot) => {
-    const game = snapshot.val();
-    if (!game) return;
     
-    updateGameUI(game);
-    
-    if (game.status === 'playing' && game.player2) {
-      startGame(game);
+    if (game.status === 'finished') {
+      showResult(game.winner);
     }
   });
   
   updateUI('created');
 }
 
-function startGame(game) {
-  // Обновляем UI
-  updateUI('playing', game);
+// Присоединение к существующей игре
+async function joinGame([gameId, game]) {
+  currentGameId = gameId;
+  currentGameRef = firebase.ref(db, `games/${gameId}`);
   
-  // Запускаем игровой процесс
-  const progressFill = document.getElementById('progress-fill');
-  let progress = 0;
+  await firebase.update(currentGameRef, {
+    player2: currentPlayer,
+    status: 'playing',
+    startedAt: Date.now()
+  });
   
-  const interval = setInterval(() => {
-    progress += 2;
-    progressFill.style.width = `${progress}%`;
-    
-    if (progress >= 100) {
-      clearInterval(interval);
-      finishGame(game);
-    }
-  }, 50);
+  updateUI('joined', game.player1.name);
 }
 
-async function finishGame(game) {
-  const isPlayer1Winner = Math.random() < 0.5;
-  const winner = isPlayer1Winner ? game.player1 : game.player2;
+// Начало игры
+function startGame(game) {
+  updateUI('playing');
   
-  // Обновляем состояние игры
-  await firebase.update(gameRef, {
+  // Симуляция боя (3 секунды)
+  setTimeout(() => {
+    finishGame(game);
+  }, 3000);
+}
+
+// Завершение игры
+async function finishGame(game) {
+  const winner = Math.random() < 0.5 ? game.player1 : game.player2;
+  
+  await firebase.update(currentGameRef, {
     winner: winner,
     status: 'finished',
     finishedAt: Date.now()
   });
+}
+
+// Показ результата
+function showResult(winner) {
+  const isWinner = winner.id === currentPlayer.id;
+  resultDisplay.textContent = isWinner ? "🎉 Вы победили! +50💰" : "😢 Вы проиграли";
+  resultDisplay.style.color = isWinner ? "#4CAF50" : "#F44336";
   
-  // Показываем результат
-  const isWinner = winner.id === window.currentPlayer.id;
-  updateUI('finished', game, isWinner);
+  actionButton.textContent = "Играть снова";
+  actionButton.disabled = false;
   
   // Удаляем игру через 10 секунд
   setTimeout(() => {
-    if (gameRef) {
-      firebase.remove(gameRef);
-      gameRef = null;
-      currentGameId = null;
+    if (currentGameRef) {
+      firebase.remove(currentGameRef);
+      resetGame();
     }
-    updateUI('waiting');
   }, 10000);
 }
 
-function updateGameUI(game) {
-  // Обновляем информацию об игроках
-  document.getElementById('player1-name').textContent = 
-    game.player1.id === window.currentPlayer.id ? 'Вы' : game.player1.name;
+// Обработчик кнопки
+function handleActionButtonClick() {
+  actionButton.disabled = true;
   
-  if (game.player2) {
-    document.getElementById('player2-name').textContent = 
-      game.player2.id === window.currentPlayer.id ? 'Вы' : game.player2.name;
-  }
-  
-  // Обновляем статус игры
-  const statusElement = document.getElementById('pvp-status');
-  const betButton = document.getElementById('pvp-bet');
-  
-  switch (game.status) {
-    case 'waiting':
-      statusElement.textContent = 'Ожидание второго игрока...';
-      betButton.textContent = 'Отменить игру';
-      betButton.onclick = cancelGame;
-      break;
-      
-    case 'playing':
-      statusElement.textContent = 'Игра началась!';
-      betButton.style.display = 'none';
-      break;
-      
-    case 'finished':
-      const isWinner = game.winner.id === window.currentPlayer.id;
-      statusElement.textContent = isWinner ? 'Вы победили!' : 'Вы проиграли';
-      betButton.style.display = 'none';
-      break;
+  if (!currentGameId) {
+    createGame();
+  } else {
+    // Если игра завершена - перезагружаем
+    location.reload();
   }
 }
 
-function updateUI(state, game, isWinner) {
-  const statusElement = document.getElementById('pvp-status');
-  const betButton = document.getElementById('pvp-bet');
-  const resultElement = document.getElementById('pvp-result');
-  
-  betButton.style.display = 'block';
-  resultElement.textContent = '';
-  
+// Сброс игры
+function resetGame() {
+  currentGameId = null;
+  currentGameRef = null;
+  updateUI('waiting');
+}
+
+// Обновление интерфейса
+function updateUI(state, opponentName = null) {
   switch (state) {
     case 'waiting':
-      statusElement.textContent = 'Ожидание игроков...';
-      betButton.textContent = 'Создать игру (50 золотых)';
-      betButton.onclick = createGame;
+      gameStatus.textContent = "Ожидание соперника...";
+      actionButton.textContent = "Создать игру (50💰)";
+      actionButton.disabled = false;
+      player1Name.textContent = "Ожидание...";
+      player2Name.textContent = "Ожидание...";
       break;
       
     case 'created':
-      statusElement.textContent = 'Ожидаем второго игрока...';
-      betButton.textContent = 'Отменить игру';
-      betButton.onclick = cancelGame;
+      gameStatus.textContent = "Ожидаем второго игрока...";
+      actionButton.textContent = "Отменить игру";
+      player1Name.textContent = currentPlayer.name;
       break;
       
     case 'joined':
-      statusElement.textContent = `Вы присоединились к ${game.player1.name}`;
-      betButton.style.display = 'none';
+      gameStatus.textContent = `Вы сражаетесь с ${opponentName}!`;
+      actionButton.style.display = "none";
+      player1Name.textContent = opponentName;
+      player2Name.textContent = currentPlayer.name;
       break;
       
     case 'playing':
-      statusElement.textContent = 'Игра началась!';
-      betButton.style.display = 'none';
-      break;
-      
-    case 'finished':
-      statusElement.textContent = isWinner ? 'Вы победили!' : 'Вы проиграли';
-      resultElement.textContent = isWinner ? '+50 золотых!' : 'Попробуйте снова!';
-      resultElement.style.color = isWinner ? '#4CAF50' : '#F44336';
-      betButton.style.display = 'block';
-      betButton.textContent = 'Играть снова';
-      betButton.onclick = () => location.reload();
+      gameStatus.textContent = "Идет бой...";
+      resultDisplay.textContent = "";
       break;
   }
 }
 
-async function cancelGame() {
-  if (gameRef) {
-    await firebase.remove(gameRef);
-  }
-  gameRef = null;
-  currentGameId = null;
-  updateUI('waiting');
-}
+// Запуск игры при загрузке
+document.addEventListener('DOMContentLoaded', initPVP);
