@@ -29,7 +29,7 @@
     </div>
   </div>
   
-  <div id="version">Build 4.4v (Fixed)</div>
+  <div id="version">Build 5.0v (Final Fix)</div>
 </div>
 
 <div id="panel">
@@ -48,14 +48,12 @@ const firebaseConfig = {
   projectId: "gizmo-27843"
 };
 
-// Инициализация с проверкой на существующее приложение
-let app;
-try {
-  app = firebase.getApp();
-} catch (e) {
-  app = firebase.initializeApp(firebaseConfig);
-}
+// Инициализация приложения
+const app = firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+
+// Очистка старых данных (выполнить один раз, затем закомментировать)
+db.ref('pvpRoulette').remove().then(() => console.log('Database cleaned'));
 
 // Текущий игрок
 const currentPlayer = {
@@ -68,8 +66,7 @@ const gameState = {
   colors: ['#FF5252', '#4CAF50', '#2196F3', '#FFC107', '#9C27B0', '#00BCD4'],
   slotWidth: 0,
   serverTimeOffset: 0,
-  isPlacingBet: false,
-  currentRoom: null
+  isPlacingBet: false
 };
 
 // Элементы интерфейса
@@ -81,52 +78,109 @@ const timerDisplay = document.getElementById('timer-display');
 const timeLeftSpan = document.getElementById('time-left');
 
 // Ссылки Firebase
-const roomRef = db.ref('pvpRoulette/room');
+const roomRef = db.ref('pvpRoulette_v3/room'); // Новая версия комнаты
 const serverTimeRef = db.ref('.info/serverTimeOffset');
 
-// Инициализация
+// Инициализация игры
 function initRouletteGame() {
-  // Синхронизация времени с сервером
+  // Синхронизация времени
   serverTimeRef.on('value', (snap) => {
     gameState.serverTimeOffset = snap.val() || 0;
   });
 
-  // Обработчик клика на кнопку ставки
-  placeBetBtn.addEventListener('click', () => {
-    if (!gameState.isPlacingBet) {
-      gameState.isPlacingBet = true;
-      placeBet().finally(() => {
-        gameState.isPlacingBet = false;
-      });
+  // Инициализация комнаты
+  roomRef.once('value').then(snapshot => {
+    if (!snapshot.exists()) {
+      resetRoom();
     }
   });
 
-  // Слушаем изменения в комнате
-  roomRef.on('value', (snapshot) => {
-    try {
-      const room = snapshot.val();
-      if (room) {
-        gameState.currentRoom = room;
-        updateGameUI(room);
-      } else {
-        resetRoom();
-      }
-    } catch (error) {
-      console.error('Ошибка обработки комнаты:', error);
-    }
-  }, (error) => {
-    console.error('Ошибка чтения комнаты:', error);
-  });
+  // Обработчик кнопки ставки
+  placeBetBtn.addEventListener('click', placeBetHandler);
+
+  // Слушатель изменений комнаты
+  roomRef.on('value', roomListener);
 }
 
-// Создание/сброс комнаты
+// Обработчик изменений комнаты
+function roomListener(snapshot) {
+  const room = snapshot.val();
+  if (!room) return resetRoom();
+
+  // Валидация игроков
+  const validPlayers = {};
+  if (room.players) {
+    Object.entries(room.players).forEach(([id, player]) => {
+      if (player && player.color && player.name && player.betTime) {
+        validPlayers[id] = player;
+      }
+    });
+  }
+
+  // Если есть невалидные игроки - чистим
+  if (Object.keys(validPlayers).length !== Object.keys(room.players || {}).length) {
+    return roomRef.child('players').set(validPlayers);
+  }
+
+  updateUI(room);
+}
+
+// Обработчик ставки
+async function placeBetHandler() {
+  if (gameState.isPlacingBet) return;
+  gameState.isPlacingBet = true;
+
+  try {
+    const room = (await roomRef.once('value')).val();
+    if (!room) return;
+
+    // Проверка статуса комнаты
+    if (room.status !== 'waiting' && room.status !== 'betting') {
+      alert('Ставки временно закрыты');
+      return;
+    }
+
+    // Проверка существующей ставки
+    if (room.players?.[currentPlayer.id]) {
+      alert('Вы уже сделали ставку');
+      return;
+    }
+
+    // Выбор цвета
+    const usedColors = Object.values(room.players || {}).map(p => p.color).filter(Boolean);
+    const availableColor = gameState.colors.find(c => !usedColors.includes(c)) || gameState.colors[0];
+
+    // Добавление игрока
+    await roomRef.child('players').child(currentPlayer.id).set({
+      name: currentPlayer.name,
+      color: availableColor,
+      betTime: Date.now() + gameState.serverTimeOffset
+    });
+
+    // Запуск таймера если нужно
+    const playerCount = Object.keys(room.players || {}).length + 1;
+    if (playerCount >= 2 && room.status === 'waiting') {
+      await roomRef.update({
+        status: 'betting',
+        startTime: Date.now() + gameState.serverTimeOffset
+      });
+    }
+  } catch (error) {
+    console.error('Ошибка ставки:', error);
+    alert('Ошибка при размещении ставки');
+  } finally {
+    gameState.isPlacingBet = false;
+  }
+}
+
+// Сброс комнаты
 function resetRoom() {
   const roomData = {
     status: 'waiting',
     players: {},
     startTime: null,
     winner: null,
-    lastReset: getServerTime()
+    lastReset: Date.now() + gameState.serverTimeOffset
   };
 
   return roomRef.set(roomData).catch(error => {
@@ -134,97 +188,108 @@ function resetRoom() {
   });
 }
 
-// Размещение ставки
-async function placeBet() {
-  try {
-    const room = gameState.currentRoom;
-    if (!room) {
-      await resetRoom();
-      return;
-    }
-
-    // Проверяем статус комнаты
-    if (room.status !== 'waiting' && room.status !== 'betting') {
-      alert('Ставки временно закрыты');
-      return;
-    }
-
-    // Проверяем, не сделал ли уже игрок ставку
-    if (room.players && room.players[currentPlayer.id]) {
-      alert('Вы уже сделали ставку');
-      return;
-    }
-
-    // Выбираем уникальный цвет
-    const usedColors = room.players ? Object.values(room.players).map(p => p?.color).filter(Boolean) : [];
-    let availableColors = gameState.colors.filter(c => !usedColors.includes(c));
-    if (availableColors.length === 0) {
-      availableColors = gameState.colors;
-    }
-
-    const randomColor = availableColors[Math.floor(Math.random() * availableColors.length)];
-
-    // Добавляем игрока в комнату
-    const playerData = {
-      name: currentPlayer.name,
-      color: randomColor,
-      betTime: getServerTime()
-    };
-
-    await roomRef.child('players').child(currentPlayer.id).set(playerData);
-
-    // Если игроков стало 2+, запускаем таймер
-    const playerCount = room.players ? Object.keys(room.players).length + 1 : 1;
-    if (playerCount >= 2 && room.status === 'waiting') {
-      await startBettingTimer();
-    }
-  } catch (error) {
-    console.error('Ошибка размещения ставки:', error);
-    alert('Ошибка при размещении ставки. Попробуйте снова.');
-    throw error;
+// Обновление интерфейса
+function updateUI(room) {
+  // Обновление статуса
+  switch (room.status) {
+    case 'waiting':
+      placeBetBtn.disabled = false;
+      placeBetBtn.textContent = 'Сделать ставку';
+      timerDisplay.style.display = 'none';
+      winnerDisplay.textContent = '';
+      break;
+      
+    case 'betting':
+      placeBetBtn.disabled = !!room.players?.[currentPlayer.id];
+      placeBetBtn.textContent = room.players?.[currentPlayer.id] 
+        ? 'Вы уже сделали ставку' 
+        : 'Сделать ставку';
+      
+      // Таймер
+      if (room.startTime) {
+        const elapsed = Math.floor((getServerTime() - room.startTime) / 1000);
+        const timeLeft = Math.max(0, 30 - elapsed);
+        timeLeftSpan.textContent = timeLeft;
+        timerDisplay.style.display = 'block';
+        
+        if (timeLeft <= 0 && Object.keys(room.players || {}).length >= 2) {
+          startRoulette(room);
+        }
+      }
+      break;
+      
+    case 'spinning':
+      placeBetBtn.disabled = true;
+      timerDisplay.style.display = 'none';
+      break;
+      
+    case 'finished':
+      showWinner(room.winner);
+      placeBetBtn.disabled = true;
+      timerDisplay.style.display = 'none';
+      break;
   }
+  
+  // Обновление рулетки
+  updateRouletteDisplay(room.players || {});
 }
 
-// Запуск таймера ставок
-function startBettingTimer() {
-  return roomRef.update({
-    status: 'betting',
-    startTime: getServerTime()
-  }).catch(error => {
-    console.error('Ошибка запуска таймера:', error);
-    throw error;
+// Обновление рулетки
+function updateRouletteDisplay(players) {
+  rouletteSlots.innerHTML = '';
+  const activePlayers = Object.values(players).filter(p => p?.color);
+  const totalPlayers = activePlayers.length;
+  
+  if (totalPlayers === 0) return;
+  
+  gameState.slotWidth = 100 / totalPlayers;
+  
+  activePlayers.forEach((player, index) => {
+    createSlot(player, index, totalPlayers);
   });
+}
+
+// Создание слота
+function createSlot(player, index, totalPlayers) {
+  const slot = document.createElement('div');
+  slot.className = 'roulette-slot';
+  slot.style.backgroundColor = player.color;
+  slot.style.width = `${gameState.slotWidth}%`;
+  slot.style.left = `${index * gameState.slotWidth}%`;
+  
+  const percent = document.createElement('div');
+  percent.className = 'slot-percent';
+  percent.textContent = `${Math.round(100 / totalPlayers)}%`;
+  percent.style.color = getContrastColor(player.color);
+  
+  slot.appendChild(percent);
+  rouletteSlots.appendChild(slot);
 }
 
 // Запуск рулетки
 function startRoulette(room) {
-  const activePlayers = room.players ? Object.entries(room.players).filter(([_, p]) => p?.color) : [];
-  if (activePlayers.length < 2) {
-    return resetRoom();
-  }
+  const activePlayers = Object.entries(room.players || {}).filter(([_, p]) => p?.color);
+  if (activePlayers.length < 2) return resetRoom();
 
-  return roomRef.update({
-    status: 'spinning'
-  }).then(() => {
+  roomRef.update({ status: 'spinning' }).then(() => {
     const spinDuration = 3000 + Math.random() * 4000;
     const winnerIndex = Math.floor(Math.random() * activePlayers.length);
     const winnerId = activePlayers[winnerIndex][0];
-    const winnerPlayer = activePlayers[winnerIndex][1];
-
-    // Анимация рулетки
+    const winner = activePlayers[winnerIndex][1];
+    
+    // Анимация
     gameState.slotWidth = 100 / activePlayers.length;
-    return animateRoulette(winnerIndex, spinDuration).then(() => {
-      // После завершения анимации объявляем победителя
-      return roomRef.update({
+    animateRoulette(winnerIndex, spinDuration, () => {
+      // Фиксация победителя
+      roomRef.update({
         status: 'finished',
         winner: {
           id: winnerId,
-          name: winnerPlayer.name,
-          color: winnerPlayer.color
+          name: winner.name,
+          color: winner.color
         },
         finishTime: getServerTime()
       }).then(() => {
-        // Через 10 секунд сбрасываем комнату
         setTimeout(resetRoom, 10000);
       });
     });
@@ -232,151 +297,43 @@ function startRoulette(room) {
 }
 
 // Анимация рулетки
-function animateRoulette(winnerIndex, duration) {
-  return new Promise((resolve) => {
-    const targetPosition = 100 - (winnerIndex * gameState.slotWidth);
+function animateRoulette(winnerIndex, duration, callback) {
+  const targetPosition = 100 - (winnerIndex * gameState.slotWidth);
+  
+  rouletteSlotsWrapper.style.transition = 'none';
+  rouletteSlotsWrapper.style.transform = 'translateX(0)';
+  
+  setTimeout(() => {
+    rouletteSlotsWrapper.style.transition = `transform ${duration/1000}s cubic-bezier(0.2, 0.1, 0.2, 1)`;
+    rouletteSlotsWrapper.style.transform = `translateX(-${targetPosition}%)`;
     
-    rouletteSlotsWrapper.style.transition = 'none';
-    rouletteSlotsWrapper.style.transform = 'translateX(0)';
-    
-    setTimeout(() => {
-      rouletteSlotsWrapper.style.transition = `transform ${duration/1000}s cubic-bezier(0.2, 0.1, 0.2, 1)`;
-      rouletteSlotsWrapper.style.transform = `translateX(-${targetPosition}%)`;
-      
-      setTimeout(resolve, duration);
-    }, 10);
-  });
+    setTimeout(callback, duration);
+  }, 10);
 }
 
-// Обновление интерфейса на основе состояния комнаты
-function updateGameUI(room) {
-  try {
-    // Обновляем статус игры
-    switch (room.status) {
-      case 'waiting':
-        placeBetBtn.disabled = false;
-        placeBetBtn.textContent = 'Сделать ставку';
-        timerDisplay.style.display = 'none';
-        winnerDisplay.textContent = '';
-        break;
-        
-      case 'betting':
-        placeBetBtn.disabled = !!(room.players && room.players[currentPlayer.id]);
-        placeBetBtn.textContent = (room.players && room.players[currentPlayer.id]) 
-          ? 'Вы уже сделали ставку' 
-          : 'Сделать ставку';
-        
-        // Обновляем таймер
-        if (room.startTime) {
-          const elapsed = Math.floor((getServerTime() - room.startTime) / 1000);
-          const timeLeft = Math.max(0, 30 - elapsed);
-          timeLeftSpan.textContent = timeLeft;
-          timerDisplay.style.display = 'block';
-          
-          if (timeLeft <= 0 && room.players && Object.keys(room.players).length >= 2) {
-            startRoulette(room);
-          }
-        }
-        break;
-        
-      case 'spinning':
-        placeBetBtn.disabled = true;
-        timerDisplay.style.display = 'none';
-        break;
-        
-      case 'finished':
-        showWinner(room.winner);
-        placeBetBtn.disabled = true;
-        timerDisplay.style.display = 'none';
-        break;
-    }
-    
-    // Обновляем отображение рулетки
-    updateRouletteDisplay(room);
-  } catch (error) {
-    console.error('Ошибка обновления интерфейса:', error);
-  }
-}
-
-// Обновление отображения рулетки
-function updateRouletteDisplay(room) {
-  try {
-    rouletteSlots.innerHTML = '';
-    
-    if (!room.players) return;
-    
-    const activePlayers = Object.values(room.players).filter(p => p?.color);
-    const totalPlayers = activePlayers.length;
-    
-    if (totalPlayers === 0) return;
-    
-    gameState.slotWidth = 100 / totalPlayers;
-    
-    activePlayers.forEach((player, index) => {
-      if (player && player.color) {
-        createSlot(player, index, totalPlayers);
-        if (index === 0) createSlot(player, -1, totalPlayers); // Дублирование для бесконечности
-      }
-    });
-  } catch (error) {
-    console.error('Ошибка обновления рулетки:', error);
-  }
-}
-
-// Создание слота
-function createSlot(player, index, totalPlayers) {
-  try {
-    const slot = document.createElement('div');
-    slot.className = 'roulette-slot';
-    slot.style.backgroundColor = player.color;
-    slot.style.width = `${gameState.slotWidth}%`;
-    slot.style.left = `${index * gameState.slotWidth}%`;
-    
-    const percent = document.createElement('div');
-    percent.className = 'slot-percent';
-    percent.textContent = `${Math.round(100 / totalPlayers)}%`;
-    percent.style.color = getContrastColor(player.color);
-    
-    slot.appendChild(percent);
-    rouletteSlots.appendChild(slot);
-  } catch (error) {
-    console.error('Ошибка создания слота:', error);
-  }
+// Показать победителя
+function showWinner(winner) {
+  if (!winner) return;
+  
+  winnerDisplay.innerHTML = `
+    <div class="winner-box" style="background-color: ${winner.color || '#7f5af0'}">
+      Победитель: ${winner.name || 'Неизвестный игрок'}!
+    </div>
+  `;
 }
 
 // Контрастный цвет текста
 function getContrastColor(hexColor) {
   if (!hexColor || typeof hexColor !== 'string' || hexColor.length < 7) return '#FFFFFF';
   
-  try {
-    const r = parseInt(hexColor.substring(1, 3), 16);
-    const g = parseInt(hexColor.substring(3, 5), 16);
-    const b = parseInt(hexColor.substring(5, 7), 16);
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    return brightness > 128 ? '#000000' : '#FFFFFF';
-  } catch (e) {
-    return '#FFFFFF';
-  }
+  const r = parseInt(hexColor.substring(1, 3), 16);
+  const g = parseInt(hexColor.substring(3, 5), 16);
+  const b = parseInt(hexColor.substring(5, 7), 16);
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness > 128 ? '#000000' : '#FFFFFF';
 }
 
-// Показать победителя
-function showWinner(winner) {
-  try {
-    if (winner) {
-      winnerDisplay.innerHTML = `
-        <div class="winner-box" style="background-color: ${winner.color || '#7f5af0'}">
-          Победитель: ${winner.name || 'Неизвестный игрок'}!
-        </div>
-      `;
-    } else {
-      winnerDisplay.textContent = '';
-    }
-  } catch (error) {
-    console.error('Ошибка отображения победителя:', error);
-  }
-}
-
-// Получение серверного времени
+// Серверное время
 function getServerTime() {
   return Date.now() + gameState.serverTimeOffset;
 }
