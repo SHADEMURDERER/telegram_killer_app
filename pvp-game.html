@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Gizmo PVP (Комнаты)</title>
+  <title>Gizmo PVP</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <link rel="stylesheet" href="styles/main.css">
@@ -12,25 +12,22 @@
 <body>
 <div id="pvp-container">
   <div class="header">
-    <h2>🎮 Комнаты PVP</h2>
-    <button id="create-room-btn" class="create-btn">+ Создать комнату</button>
+    <h2>🎮 PVP Рулетка</h2>
   </div>
   
-  <div id="rooms-list">
-    <div class="empty-message">Нет доступных комнат</div>
-  </div>
-  
-  <div id="room-details" style="display: none;">
-    <h3 id="room-name"></h3>
-    <div id="players-list"></div>
-    <div id="room-controls">
-      <button id="ready-btn" class="ready-btn">Готов</button>
-      <button id="leave-room-btn" class="leave-btn">Покинуть комнату</button>
+  <div id="roulette-container">
+    <div id="roulette-track">
+      <div id="roulette-arrow"></div>
+      <div id="roulette-slots"></div>
     </div>
-    <div id="game-status"></div>
+    <div id="roulette-info"></div>
+    <div id="bet-controls">
+      <button id="place-bet-btn" class="bet-btn">Сделать ставку</button>
+      <div id="timer-display" style="display: none;">Осталось: 30с</div>
+    </div>
   </div>
   
-  <div id="version">Build 2.1v (FixedSystem)</div>
+  <div id="version">Build 2.2v (Roulette)</div>
 </div>
 
 <div id="panel">
@@ -54,383 +51,220 @@ const db = firebase.database();
 // Текущий игрок
 const currentPlayer = {
   id: window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 'player_' + Math.random().toString(36).slice(2, 9),
-  name: window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || 'Игрок',
-  ready: false
+  name: window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || 'Игрок'
 };
 
-let currentRoomId = null;
-let currentRoomRef = null;
-let roomsRef = db.ref('rooms');
+// Состояние игры
+const gameState = {
+  players: {},
+  status: 'waiting',
+  timer: 30,
+  winner: null,
+  colors: ['#FF5252', '#4CAF50', '#2196F3', '#FFC107', '#9C27B0', '#00BCD4'],
+  usedColors: []
+};
 
 // Элементы интерфейса
-const roomsList = document.getElementById('rooms-list');
-const roomDetails = document.getElementById('room-details');
-const roomName = document.getElementById('room-name');
-const playersList = document.getElementById('players-list');
-const gameStatus = document.getElementById('game-status');
-const createRoomBtn = document.getElementById('create-room-btn');
-const readyBtn = document.getElementById('ready-btn');
-const leaveRoomBtn = document.getElementById('leave-room-btn');
+const rouletteSlots = document.getElementById('roulette-slots');
+const rouletteInfo = document.getElementById('roulette-info');
+const placeBetBtn = document.getElementById('place-bet-btn');
+const timerDisplay = document.getElementById('timer-display');
+
+// Ссылки Firebase
+const gameRef = db.ref('pvpRoulette/game');
+const playersRef = db.ref('pvpRoulette/players');
 
 // Инициализация
-function initPVPRoomSystem() {
-  createRoomBtn.addEventListener('click', showCreateRoomModal);
-  readyBtn.addEventListener('click', toggleReadyStatus);
-  leaveRoomBtn.addEventListener('click', leaveRoom);
+function initRouletteGame() {
+  placeBetBtn.addEventListener('click', placeBet);
   
-  loadRooms();
+  // Слушаем изменения в игре
+  gameRef.on('value', (snapshot) => {
+    const game = snapshot.val();
+    if (game) {
+      updateGameState(game);
+    }
+  });
   
-  roomsRef.on('value', (snapshot) => {
-    updateRoomsList(snapshot);
-  }, (error) => {
-    console.error("Ошибка чтения комнат:", error);
+  // Слушаем изменения игроков
+  playersRef.on('value', (snapshot) => {
+    const players = snapshot.val() || {};
+    updatePlayers(players);
   });
 }
 
-// Показать модальное окно создания комнаты
-function showCreateRoomModal() {
-  const modal = document.createElement('div');
-  modal.className = 'modal';
-  modal.innerHTML = `
-    <div class="modal-content">
-      <h3>Создать комнату</h3>
-      <div class="form-group">
-        <label for="room-name-input">Название комнаты:</label>
-        <input type="text" id="room-name-input" placeholder="Моя комната">
-      </div>
-      <div class="form-group">
-        <label for="max-players">Макс. игроков:</label>
-        <select id="max-players">
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-        </select>
-      </div>
-      <div class="modal-buttons">
-        <button id="confirm-create">Создать</button>
-        <button id="cancel-create">Отмена</button>
-      </div>
-    </div>
-  `;
+// Размещение ставки
+function placeBet() {
+  if (gameState.status !== 'waiting' && gameState.status !== 'betting') {
+    alert('Ставки временно закрыты');
+    return;
+  }
   
-  document.body.appendChild(modal);
+  if (gameState.players[currentPlayer.id]) {
+    alert('Вы уже сделали ставку');
+    return;
+  }
   
-  document.getElementById('confirm-create').addEventListener('click', () => {
-    const name = document.getElementById('room-name-input').value.trim() || 'Моя комната';
-    const maxPlayers = parseInt(document.getElementById('max-players').value);
-    createRoom(name, maxPlayers);
-    modal.remove();
-  });
+  // Выбираем уникальный цвет
+  let availableColors = gameState.colors.filter(c => !gameState.usedColors.includes(c));
+  if (availableColors.length === 0) {
+    availableColors = gameState.colors;
+    gameState.usedColors = [];
+  }
   
-  document.getElementById('cancel-create').addEventListener('click', () => {
-    modal.remove();
-  });
-}
-
-// Создать новую комнату
-function createRoom(name, maxPlayers) {
-  currentRoomId = roomsRef.push().key;
-  currentRoomRef = db.ref(`rooms/${currentRoomId}`);
+  const randomColor = availableColors[Math.floor(Math.random() * availableColors.length)];
+  gameState.usedColors.push(randomColor);
   
-  const roomData = {
-    name: name,
-    maxPlayers: maxPlayers,
-    players: {
-      [currentPlayer.id]: {
-        name: currentPlayer.name,
-        ready: false
-      }
-    },
-    status: 'waiting',
-    createdAt: firebase.database.ServerValue.TIMESTAMP,
-    creator: currentPlayer.id
+  // Добавляем игрока
+  const playerData = {
+    name: currentPlayer.name,
+    color: randomColor,
+    betTime: Date.now()
   };
   
-  currentRoomRef.set(roomData)
+  playersRef.child(currentPlayer.id).set(playerData)
     .then(() => {
-      joinRoom(currentRoomId, true);
+      if (Object.keys(gameState.players).length === 0) {
+        // Первый игрок - обновляем статус игры
+        gameRef.update({
+          status: 'betting',
+          startTime: Date.now()
+        });
+      }
     })
     .catch(error => {
-      console.error("Ошибка создания комнаты:", error);
-      alert("Не удалось создать комнату");
+      console.error('Ошибка при размещении ставки:', error);
     });
 }
 
-// Загрузить список комнат
-function loadRooms() {
-  roomsRef.once('value')
-    .then(snapshot => {
-      updateRoomsList(snapshot);
-    })
-    .catch(error => {
-      console.error("Ошибка загрузки комнат:", error);
-    });
-}
-
-// Обновить список комнат
-function updateRoomsList(snapshot) {
-  roomsList.innerHTML = '';
+// Обновление состояния игры
+function updateGameState(game) {
+  gameState.status = game.status;
+  gameState.winner = game.winner || null;
   
-  if (!snapshot.exists()) {
-    roomsList.innerHTML = '<div class="empty-message">Нет доступных комнат</div>';
+  if (game.status === 'betting') {
+    const timeLeft = Math.max(0, 30 - Math.floor((Date.now() - game.startTime) / 1000));
+    gameState.timer = timeLeft;
+    
+    if (timeLeft <= 0 && Object.keys(gameState.players).length >= 2) {
+      startRoulette();
+    } else {
+      updateTimerDisplay();
+    }
+  } else if (game.status === 'spinning') {
+    placeBetBtn.disabled = true;
+  } else if (game.status === 'finished') {
+    setTimeout(() => {
+      resetGame();
+    }, 10000);
+  }
+}
+
+// Обновление списка игроков
+function updatePlayers(players) {
+  gameState.players = players;
+  updateRouletteDisplay();
+  
+  // Если игроков >= 2 и статус waiting - переключаем на betting
+  if (Object.keys(players).length >= 2 && gameState.status === 'waiting') {
+    gameRef.update({
+      status: 'betting',
+      startTime: Date.now()
+    });
+  }
+}
+
+// Обновление отображения рулетки
+function updateRouletteDisplay() {
+  rouletteSlots.innerHTML = '';
+  const players = Object.values(gameState.players);
+  const totalPlayers = players.length;
+  
+  if (totalPlayers === 0) {
+    rouletteInfo.textContent = 'Ожидание ставок...';
     return;
   }
   
-  const rooms = snapshot.val();
-  let hasAvailableRooms = false;
-  
-  Object.entries(rooms).forEach(([roomId, room]) => {
-    if (!room) return;
-    
-    const playerCount = Object.keys(room.players || {}).length;
-    const isAvailable = room.status === 'waiting' && playerCount < (room.maxPlayers || 2);
-    
-    if (isAvailable) {
-      hasAvailableRooms = true;
-      
-      const roomCard = document.createElement('div');
-      roomCard.className = 'room-card';
-      roomCard.innerHTML = `
-        <h3>${room.name || 'Без названия'}</h3>
-        <p>Игроков: ${playerCount}/${room.maxPlayers || 2}</p>
-        <div class="room-meta">
-          <span>${formatTime(room.createdAt)}</span>
-          <span>${getRoomStatus(room)}</span>
-        </div>
-      `;
-      
-      roomCard.addEventListener('click', () => {
-        if (roomId !== currentRoomId) {
-          joinRoom(roomId);
-        }
-      });
-      
-      roomsList.appendChild(roomCard);
-    }
+  // Создаем слоты для каждого игрока
+  players.forEach(player => {
+    const slot = document.createElement('div');
+    slot.className = 'roulette-slot';
+    slot.style.backgroundColor = player.color;
+    slot.style.width = `${100 / totalPlayers}%`;
+    rouletteSlots.appendChild(slot);
   });
   
-  if (!hasAvailableRooms) {
-    roomsList.innerHTML = '<div class="empty-message">Нет доступных комнат</div>';
-  }
+  // Обновляем информацию о шансах
+  const chance = Math.round(100 / totalPlayers);
+  rouletteInfo.textContent = `У всех игроков по ${chance}% шанса`;
 }
 
-// Присоединиться к комнате
-function joinRoom(roomId, isCreator = false) {
-  if (currentRoomId && currentRoomId !== roomId) {
-    leaveRoom();
-  }
-  
-  currentRoomId = roomId;
-  currentRoomRef = db.ref(`rooms/${roomId}`);
-  
-  if (isCreator) {
-    setupRoomListeners();
-    showRoomDetails();
-  } else {
-    currentRoomRef.transaction(room => {
-      if (!room) return null;
-      
-      const playerCount = Object.keys(room.players || {}).length;
-      if (playerCount >= (room.maxPlayers || 2)) {
-        alert("Комната уже заполнена");
-        return;
-      }
-      
-      if (!room.players) {
-        room.players = {};
-      }
-      
-      if (!room.players[currentPlayer.id]) {
-        room.players[currentPlayer.id] = {
-          name: currentPlayer.name,
-          ready: false
-        };
-      }
-      
-      return room;
-    })
-    .then(() => {
-      setupRoomListeners();
-      showRoomDetails();
-    })
-    .catch(error => {
-      console.error("Ошибка присоединения к комнате:", error);
-      currentRoomId = null;
-      currentRoomRef = null;
-    });
-  }
-}
-
-// Настроить слушатели комнаты
-function setupRoomListeners() {
-  currentRoomRef.on('value', snapshot => {
-    const room = snapshot.val();
-    if (!room) {
-      currentRoomId = null;
-      currentRoomRef = null;
-      hideRoomDetails();
-      return;
-    }
+// Обновление таймера
+function updateTimerDisplay() {
+  if (gameState.status === 'betting' && gameState.timer >= 0) {
+    timerDisplay.style.display = 'block';
+    timerDisplay.textContent = `Осталось: ${gameState.timer}с`;
     
-    updateRoomDetails(room);
-    
-    if (room.status === 'waiting' && allPlayersReady(room)) {
-      startGame();
-    }
-  }, (error) => {
-    console.error("Ошибка слушателя комнаты:", error);
-  });
-}
-
-// Показать детали комнаты
-function showRoomDetails() {
-  document.getElementById('pvp-container').querySelector('.header').style.display = 'none';
-  roomsList.style.display = 'none';
-  roomDetails.style.display = 'block';
-}
-
-// Скрыть детали комнаты
-function hideRoomDetails() {
-  document.getElementById('pvp-container').querySelector('.header').style.display = 'flex';
-  roomsList.style.display = 'grid';
-  roomDetails.style.display = 'none';
-  loadRooms();
-}
-
-// Обновить детали комнаты
-function updateRoomDetails(room) {
-  roomName.textContent = room.name || 'Без названия';
-  playersList.innerHTML = '';
-  
-  Object.entries(room.players || {}).forEach(([playerId, player]) => {
-    const playerItem = document.createElement('div');
-    playerItem.className = 'player-item';
-    playerItem.innerHTML = `
-      <span>${player.name || 'Игрок'} ${playerId === currentPlayer.id ? '(Вы)' : ''}</span>
-      <span class="player-status ${player.ready ? 'ready-status">✓' : 'not-ready-status">✗'}</span>
-    `;
-    playersList.appendChild(playerItem);
-  });
-  
-  if (room.status === 'waiting') {
-    gameStatus.textContent = 'Ожидание игроков...';
-    readyBtn.style.display = 'inline-block';
-    readyBtn.textContent = currentPlayer.ready ? 'Не готов' : 'Готов';
-  } else if (room.status === 'playing') {
-    gameStatus.textContent = 'Игра началась!';
-    readyBtn.style.display = 'none';
-  } else if (room.status === 'finished') {
-    gameStatus.textContent = 'Игра завершена';
-    readyBtn.style.display = 'none';
-  }
-}
-
-// Переключить статус готовности
-function toggleReadyStatus() {
-  currentPlayer.ready = !currentPlayer.ready;
-  
-  currentRoomRef.child(`players/${currentPlayer.id}/ready`).set(currentPlayer.ready)
-    .then(() => {
-      readyBtn.textContent = currentPlayer.ready ? 'Не готов' : 'Готов';
-    })
-    .catch(error => {
-      console.error("Ошибка обновления статуса готовности:", error);
-    });
-}
-
-// Все ли игроки готовы
-function allPlayersReady(room) {
-  return Object.values(room.players || {}).every(player => player.ready);
-}
-
-// Начать игру
-function startGame() {
-  currentRoomRef.update({ status: 'playing' })
-    .then(() => {
+    if (gameState.timer > 0) {
       setTimeout(() => {
-        finishGame();
-      }, 3000);
-    })
-    .catch(error => {
-      console.error("Ошибка начала игры:", error);
-    });
-}
-
-// Завершить игру
-function finishGame() {
-  currentRoomRef.once('value')
-    .then(snapshot => {
-      const room = snapshot.val();
-      if (!room) return;
-      
-      const players = Object.keys(room.players || {});
-      if (players.length === 0) return;
-      
-      const winnerId = players[Math.floor(Math.random() * players.length)];
-      
-      return currentRoomRef.update({
-        status: 'finished',
-        winner: winnerId,
-        finishedAt: firebase.database.ServerValue.TIMESTAMP
-      });
-    })
-    .catch(error => {
-      console.error("Ошибка завершения игры:", error);
-    });
-}
-
-// Покинуть комнату
-function leaveRoom() {
-  if (!currentRoomId || !currentRoomRef) {
-    hideRoomDetails();
-    return;
+        gameState.timer--;
+        updateTimerDisplay();
+      }, 1000);
+    } else {
+      startRoulette();
+    }
   }
-  
-  const roomRef = currentRoomRef;
-  
-  roomRef.transaction(room => {
-    if (!room) return null;
-    
-    // Удаляем текущего игрока из комнаты
-    if (room.players && room.players[currentPlayer.id]) {
-      delete room.players[currentPlayer.id];
-    }
-    
-    // Если выходит создатель комнаты, назначаем нового создателя
-    if (room.creator === currentPlayer.id && Object.keys(room.players || {}).length > 0) {
-      const remainingPlayers = Object.keys(room.players);
-      room.creator = remainingPlayers[0]; // Назначаем первого оставшегося игрока создателем
-    }
-    
-    return room;
-  })
-  .then(() => {
-    currentRoomId = null;
-    currentRoomRef = null;
-    currentPlayer.ready = false;
-    hideRoomDetails();
-  })
-  .catch(error => {
-    console.error("Ошибка выхода из комнаты:", error);
+}
+
+// Запуск рулетки
+function startRoulette() {
+  gameRef.update({
+    status: 'spinning'
   });
+  
+  placeBetBtn.disabled = true;
+  timerDisplay.style.display = 'none';
+  
+  // Анимация вращения рулетки
+  const spinDuration = 3000 + Math.random() * 4000; // 3-7 секунд
+  const players = Object.values(gameState.players);
+  const winnerIndex = Math.floor(Math.random() * players.length);
+  const winner = players[winnerIndex];
+  
+  // Анимация
+  rouletteSlots.style.transition = 'none';
+  rouletteSlots.style.transform = 'translateX(0)';
+  
+  setTimeout(() => {
+    rouletteSlots.style.transition = `transform ${spinDuration/1000}s cubic-bezier(0.1, 0.7, 0.1, 1)`;
+    const shift = 100 - (winnerIndex * (100 / players.length));
+    rouletteSlots.style.transform = `translateX(-${shift}%)`;
+    
+    setTimeout(() => {
+      gameRef.update({
+        status: 'finished',
+        winner: Object.keys(gameState.players)[winnerIndex],
+        finishTime: Date.now()
+      });
+    }, spinDuration);
+  }, 50);
 }
 
-// Вспомогательные функции
-function formatTime(timestamp) {
-  if (!timestamp) return '';
-  const date = new Date(timestamp);
-  return date.toLocaleTimeString();
-}
-
-function getRoomStatus(room) {
-  if (!room) return 'Неизвестно';
-  if (room.status === 'playing') return 'Игра идет';
-  if (room.status === 'finished') return 'Завершена';
-  return 'Ожидание';
+// Сброс игры
+function resetGame() {
+  playersRef.remove();
+  gameRef.update({
+    status: 'waiting',
+    winner: null,
+    startTime: null
+  });
+  
+  placeBetBtn.disabled = false;
+  gameState.usedColors = [];
 }
 
 // Инициализация при загрузке
-document.addEventListener('DOMContentLoaded', initPVPRoomSystem);
+document.addEventListener('DOMContentLoaded', initRouletteGame);
 </script>
 </body>
 </html>
