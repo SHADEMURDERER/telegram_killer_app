@@ -1,75 +1,32 @@
 let currentPlayer = {
   id: null,
-  name: 'Гость',
+  name: 'Игрок',
   username: '@username',
-  inventory: [],
   balance: 0,
-  registrationDate: null,
-  lastLogin: null
+  inventory: [],
+  stats: {
+    wins: 0,
+    losses: 0,
+    draws: 0
+  }
 };
 
-async function initTelegram() {
-  const firebaseConfig = {
-    apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
-    databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
-  };
-  
-  const app = firebase.initializeApp(firebaseConfig);
-  window.db = firebase.database();
+const firebaseConfig = {
+  apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
+  databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com",
+  projectId: "gizmo-27843",
+  appId: "1:7664399240:web:3a9c8a7b3b3c9b3c8a7b3b"
+};
 
-  if (window.Telegram?.WebApp?.initData) {
-    try {
-      const isValid = await validateTelegramData(Telegram.WebApp.initData);
-      if (!isValid) throw new Error('Invalid Telegram data');
-
-      const user = Telegram.WebApp.initDataUnsafe.user;
-      if (!user?.id) throw new Error('No user data');
-
-      const userId = 'tg_' + user.id;
-      const userRef = firebase.database().ref(`users/${userId}`);
-
-      const snapshot = await userRef.once('value');
-      
-      if (snapshot.exists()) {
-        const userData = snapshot.val();
-        currentPlayer = {
-          id: userId,
-          name: userData.name || user.first_name || 'Игрок',
-          username: userData.username || (user.username ? '@' + user.username : 'tg://user?id=' + user.id),
-          inventory: userData.inventory || [],
-          balance: userData.balance || 0,
-          registrationDate: userData.registrationDate || new Date().toISOString(),
-          lastLogin: new Date().toISOString()
-        };
-      } else {
-        currentPlayer = {
-          id: userId,
-          name: user.first_name || 'Игрок',
-          username: user.username ? '@' + user.username : 'tg://user?id=' + user.id,
-          inventory: [],
-          balance: 100,
-          registrationDate: new Date().toISOString(),
-          lastLogin: new Date().toISOString()
-        };
-        await userRef.set(currentPlayer);
-      }
-
-      await userRef.update({
-        lastLogin: new Date().toISOString(),
-        isOnline: true
-      });
-
-      Telegram.WebApp.expand();
-    } catch (error) {
-      console.error('Ошибка авторизации:', error);
-      currentPlayer.id = 'local_' + Math.random().toString(36).substring(2, 9);
-    }
-  } else {
-    currentPlayer.id = 'local_' + Math.random().toString(36).substring(2, 9);
+function initFirebase() {
+  try {
+    const app = firebase.initializeApp(firebaseConfig);
+    window.db = firebase.database(app);
+    return true;
+  } catch (error) {
+    console.error('Ошибка инициализации Firebase:', error);
+    return false;
   }
-
-  updateUserInterface();
-  initPresenceTracking();
 }
 
 async function validateTelegramData(initData) {
@@ -104,57 +61,132 @@ async function validateTelegramData(initData) {
 
     return hexSecret === hash;
   } catch (error) {
-    console.error('Validation error:', error);
+    console.error('Ошибка валидации данных Telegram:', error);
     return false;
   }
 }
 
-function updateUserInterface() {
-  if (document.getElementById('username')) {
-    document.getElementById('username').textContent = currentPlayer.name;
-  }
-  if (document.getElementById('user-telegram')) {
-    document.getElementById('user-telegram').textContent = currentPlayer.username;
-  }
-  if (document.getElementById('user-nickname')) {
-    document.getElementById('user-nickname').textContent = currentPlayer.name;
-  }
-}
-
-async function updateNickname() {
-  const newNickname = document.getElementById('nickname-input').value.trim();
-  if (!newNickname || !currentPlayer.id || currentPlayer.id.startsWith('local_')) return;
+async function initTelegram() {
+  if (!window.Telegram?.WebApp) return false;
 
   try {
-    await firebase.database().ref(`users/${currentPlayer.id}/name`).set(newNickname);
+    if (Telegram.WebApp.initData) {
+      const isValid = await validateTelegramData(Telegram.WebApp.initData);
+      if (!isValid) throw new Error('Invalid Telegram data');
+    }
+
+    const user = Telegram.WebApp.initDataUnsafe?.user;
+    if (!user?.id) throw new Error('No Telegram user data');
+
+    const userId = `tg_${user.id}`;
+    const userRef = firebase.database().ref(`users/${userId}`);
+
+    const snapshot = await userRef.once('value');
+    const userData = snapshot.val() || {};
+
+    currentPlayer = {
+      id: userId,
+      name: userData.name || user.first_name || 'Игрок',
+      username: userData.username || (user.username ? `@${user.username}` : `tg://user?id=${user.id}`),
+      balance: userData.balance || 100,
+      inventory: userData.inventory || [],
+      stats: userData.stats || { wins: 0, losses: 0, draws: 0 }
+    };
+
+    await userRef.update({
+      lastLogin: firebase.database.ServerValue.TIMESTAMP,
+      isOnline: true
+    });
+
+    Telegram.WebApp.expand();
+    return true;
+  } catch (error) {
+    console.error('Ошибка инициализации Telegram:', error);
+    initLocalUser();
+    return false;
+  }
+}
+
+function initLocalUser() {
+  const savedUser = localStorage.getItem('localUser');
+  if (savedUser) {
+    currentPlayer = JSON.parse(savedUser);
+  } else {
+    currentPlayer = {
+      id: `local_${Math.random().toString(36).substr(2, 9)}`,
+      name: 'Гость',
+      username: `guest_${Math.random().toString(36).substr(2, 6)}`,
+      balance: 50,
+      inventory: [],
+      stats: { wins: 0, losses: 0, draws: 0 }
+    };
+    localStorage.setItem('localUser', JSON.stringify(currentPlayer));
+  }
+}
+
+function updateUserPresence(isOnline) {
+  if (!currentPlayer.id || !currentPlayer.id.startsWith('tg_')) return;
+  
+  const presenceRef = firebase.database().ref(`userPresence/${currentPlayer.id}`);
+  presenceRef.update({
+    isOnline,
+    lastSeen: firebase.database.ServerValue.TIMESTAMP
+  });
+}
+
+function trackUserAction(action, data = {}) {
+  if (!currentPlayer.id) return;
+
+  const actionRef = firebase.database().ref(`userActions/${currentPlayer.id}`).push();
+  actionRef.set({
+    action,
+    ...data,
+    timestamp: firebase.database.ServerValue.TIMESTAMP,
+    userAgent: navigator.userAgent,
+    page: window.location.pathname
+  });
+}
+
+async function updateNickname(newNickname) {
+  if (!newNickname || !currentPlayer.id) return false;
+
+  try {
+    if (currentPlayer.id.startsWith('tg_')) {
+      await firebase.database().ref(`users/${currentPlayer.id}/name`).set(newNickname);
+    } else {
+      currentPlayer.name = newNickname;
+      localStorage.setItem('localUser', JSON.stringify(currentPlayer));
+    }
+    
+    trackUserAction('nickname_change', { oldName: currentPlayer.name, newName: newNickname });
     currentPlayer.name = newNickname;
-    updateUserInterface();
+    return true;
   } catch (error) {
     console.error('Ошибка изменения ника:', error);
+    return false;
   }
 }
 
-function initPresenceTracking() {
-  if (!currentPlayer.id || currentPlayer.id.startsWith('local_') || !window.db) return;
+function handleBeforeUnload() {
+  updateUserPresence(false);
+  trackUserAction('page_leave');
+}
 
-  const presenceRef = firebase.database().ref(`userPresence/${currentPlayer.id}`);
-  presenceRef.set(true);
-
-  window.addEventListener('beforeunload', () => {
-    presenceRef.update({
-      isOnline: false,
-      lastSeen: new Date().toISOString()
-    });
-  });
-
+function initEventListeners() {
+  window.addEventListener('beforeunload', handleBeforeUnload);
+  
   if (window.Telegram?.WebApp) {
     Telegram.WebApp.onEvent('viewportChanged', (e) => {
-      presenceRef.update({
-        isOnline: e.isExpanded,
-        lastSeen: new Date().toISOString()
-      });
+      updateUserPresence(e.isExpanded);
     });
   }
 }
 
-document.addEventListener('DOMContentLoaded', initTelegram);
+async function initApp() {
+  initFirebase();
+  await initTelegram();
+  initEventListeners();
+  trackUserAction('page_visit');
+}
+
+document.addEventListener('DOMContentLoaded', initApp);

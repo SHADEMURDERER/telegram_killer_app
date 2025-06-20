@@ -24,27 +24,18 @@
 
 #title {
   position: absolute;
-  top: 50%;
+  top: 40%;
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: 4.5rem;
   font-weight: bold;
   color: white;
-  text-shadow: 0 0 15px rgba(255,255,255,0.7);
+  text-shadow: 0 0 15px rgba(127, 90, 240, 0.7);
   opacity: 0;
-  filter: blur(15px);
   z-index: 1001;
   animation: 
-    titleAppear 1.5s 4s ease-out forwards;
-}
-
-#content {
-  opacity: 0;
-  transition: opacity 1s ease 5s;
-}
-
-#content.visible {
-  opacity: 1;
+    titleDropIn 0.8s ease-out forwards,
+    titleFloatUp 0.5s 1.5s ease-out forwards;
 }
 
 @keyframes rotate {
@@ -58,12 +49,73 @@
   100% { transform: scale(1); opacity: 1; }
 }
 
-@keyframes flyThrough {
-  0% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(5); opacity: 0; }
+@keyframes titleDropIn {
+  0% { opacity: 0; transform: translate(-50%, -100vh); }
+  100% { opacity: 1; transform: translate(-50%, -50%); }
 }
 
-@keyframes titleAppear {
-  0% { opacity: 0; filter: blur(15px); transform: translate(-50%, -50%) scale(0.8); }
-  100% { opacity: 1; filter: blur(0); transform: translate(-50%, -50%) scale(1); }
+@keyframes titleFloatUp {
+  0% { opacity: 1; transform: translate(-50%, -50%); }
+  100% { opacity: 0; transform: translate(-50%, -80vh); }
+}
+
+.slide-panel {
+  position: fixed;
+  bottom: 80px;
+  left: 0;
+  right: 0;
+  background: rgba(42, 40, 38, 0.98);
+  backdrop-filter: blur(20px);
+  border-radius: 25px 25px 0 0;
+  padding: 20px;
+  z-index: 1001;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 -10px 30px rgba(0,0,0,0.3);
+  max-height: 80vh;
+  margin: 0 auto;
+  width: 95%;
+  max-width: 500px;
+}
+
+.panel-content {
+  padding: 15px;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.3s ease 0.2s;
+}
+
+.slide-panel.active .panel-content {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.telegram-username {
+  color: #7f5af0;
+  font-weight: bold;
+  margin: 10px 0;
+}
+
+.nickname-edit {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.nickname-edit input {
+  flex: 1;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid #7f5af0;
+  border-radius: 8px;
+  padding: 10px;
+  color: white;
+}
+
+.nickname-edit button {
+  background: #7f5af0;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0 20px;
+  cursor: pointer;
 }
