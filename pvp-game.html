@@ -29,7 +29,7 @@
     </div>
   </div>
   
-  <div id="version">Build 2.5v (FixedRoulette)</div>
+  <div id="version">Build 2.6v (SyncedRoulette)</div>
 </div>
 
 <div id="panel">
@@ -65,7 +65,8 @@ const gameState = {
   winner: null,
   colors: ['#FF5252', '#4CAF50', '#2196F3', '#FFC107', '#9C27B0', '#00BCD4'],
   usedColors: [],
-  slotWidth: 0
+  slotWidth: 0,
+  serverTimeOffset: 0
 };
 
 // Элементы интерфейса
@@ -78,13 +79,19 @@ const timerDisplay = document.getElementById('timer-display');
 // Ссылки Firebase
 const gameRef = db.ref('pvpRoulette/game');
 const playersRef = db.ref('pvpRoulette/players');
+const serverTimeRef = db.ref('.info/serverTimeOffset');
 
 // Инициализация
 function initRouletteGame() {
+  // Синхронизация времени с сервером
+  serverTimeRef.on('value', (snap) => {
+    gameState.serverTimeOffset = snap.val() || 0;
+  });
+
   placeBetBtn.addEventListener('click', placeBet);
   
-  // Инициализация игры
-  resetGameState();
+  // Полный сброс игры при загрузке
+  resetGameState(true);
   
   // Слушаем изменения в игре
   gameRef.on('value', (snapshot) => {
@@ -101,16 +108,37 @@ function initRouletteGame() {
   });
 }
 
+// Получение синхронизированного времени сервера
+function getServerTime() {
+  return Date.now() + gameState.serverTimeOffset;
+}
+
 // Сброс состояния игры
-function resetGameState() {
-  gameRef.transaction(currentData => {
-    return {
-      status: 'waiting',
-      startTime: null,
-      winner: null,
-      finishTime: null
-    };
-  });
+function resetGameState(initial = false) {
+  if (initial) {
+    // Полный сброс только при инициализации
+    gameRef.transaction(currentData => {
+      if (currentData === null || initial) {
+        return {
+          status: 'waiting',
+          startTime: null,
+          winner: null,
+          finishTime: null,
+          lastReset: getServerTime()
+        };
+      }
+      return currentData;
+    });
+  }
+  
+  // Локальный сброс
+  gameState.usedColors = [];
+  winnerDisplay.textContent = '';
+  placeBetBtn.disabled = false;
+  
+  // Сброс позиции рулетки
+  rouletteSlotsWrapper.style.transition = 'none';
+  rouletteSlotsWrapper.style.transform = 'translateX(0)';
 }
 
 // Размещение ставки
@@ -139,7 +167,7 @@ function placeBet() {
   const playerData = {
     name: currentPlayer.name,
     color: randomColor,
-    betTime: Date.now()
+    betTime: getServerTime()
   };
   
   playersRef.child(currentPlayer.id).set(playerData)
@@ -151,14 +179,15 @@ function placeBet() {
 
 // Обновление состояния игры
 function updateGameState(game) {
+  const oldStatus = gameState.status;
   gameState.status = game.status;
   gameState.winner = game.winner || null;
   
   if (game.status === 'betting') {
-    const timeLeft = Math.max(0, 30 - Math.floor((Date.now() - game.startTime) / 1000));
-    gameState.timer = timeLeft;
+    const elapsed = Math.floor((getServerTime() - game.startTime) / 1000);
+    gameState.timer = Math.max(0, 30 - elapsed);
     
-    if (timeLeft <= 0 && Object.keys(gameState.players).length >= 2) {
+    if (gameState.timer <= 0 && Object.keys(gameState.players).length >= 2) {
       startRoulette();
     } else {
       updateTimerDisplay();
@@ -168,9 +197,11 @@ function updateGameState(game) {
     timerDisplay.style.display = 'none';
   } else if (game.status === 'finished') {
     showWinner(game.winner);
-    setTimeout(() => {
-      resetGame();
-    }, 10000);
+    if (oldStatus !== 'finished') {
+      setTimeout(() => {
+        resetGame();
+      }, 10000);
+    }
   }
 }
 
@@ -183,7 +214,7 @@ function updatePlayers(players) {
   if (Object.keys(players).length >= 2 && gameState.status === 'waiting') {
     gameRef.update({
       status: 'betting',
-      startTime: Date.now()
+      startTime: getServerTime()
     });
   }
 }
@@ -205,8 +236,8 @@ function updateRouletteDisplay() {
   // Создаем дублированные слоты для бесконечной анимации
   players.forEach((player, index) => {
     createSlot(player, index);
-    // Дублируем слоты для бесшовной анимации
-    if (index === 0) createSlot(player, index, true);
+    // Дублируем первый слот для бесшовной анимации
+    if (index === 0) createSlot(player, -1);
   });
 }
 
@@ -217,9 +248,6 @@ function createSlot(player, index, isClone = false) {
   slot.style.backgroundColor = player.color;
   slot.style.width = `${gameState.slotWidth}%`;
   slot.style.left = `${index * gameState.slotWidth}%`;
-  if (isClone) {
-    slot.style.left = `${(index - 1) * gameState.slotWidth}%`;
-  }
   
   // Добавляем процент в слот
   const percent = document.createElement('div');
@@ -248,7 +276,8 @@ function updateTimerDisplay() {
     
     if (gameState.timer > 0) {
       setTimeout(() => {
-        gameState.timer--;
+        const elapsed = Math.floor((getServerTime() - gameRef.startTime) / 1000);
+        gameState.timer = Math.max(0, 30 - elapsed);
         updateTimerDisplay();
       }, 1000);
     }
@@ -284,7 +313,7 @@ function startRoulette() {
       gameRef.update({
         status: 'finished',
         winner: Object.keys(gameState.players)[winnerIndex],
-        finishTime: Date.now()
+        finishTime: getServerTime()
       });
     }, spinDuration);
   }, 10);
@@ -305,14 +334,16 @@ function showWinner(winnerId) {
 // Полный сброс игры
 function resetGame() {
   playersRef.remove().then(() => {
-    resetGameState();
-    placeBetBtn.disabled = false;
-    gameState.usedColors = [];
-    winnerDisplay.textContent = '';
+    gameRef.update({
+      status: 'waiting',
+      winner: null,
+      startTime: null,
+      finishTime: null,
+      lastReset: getServerTime()
+    });
     
-    // Сбрасываем позицию рулетки
-    rouletteSlotsWrapper.style.transition = 'none';
-    rouletteSlotsWrapper.style.transform = 'translateX(0)';
+    // Локальный сброс
+    resetGameState();
   });
 }
 
