@@ -7,19 +7,17 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <link rel="stylesheet" href="styles/main.css">
   <link rel="stylesheet" href="styles/pvp-game.css">
+  <link rel="stylesheet" href="styles/panel.css">
 </head>
 <body>
-
 <div id="pvp-container">
   <div class="header">
     <h2>🎮 Комнаты PVP</h2>
     <button id="create-room-btn" class="create-btn">+ Создать комнату</button>
   </div>
-  
   <div id="rooms-list">
     <div class="empty-message">Нет доступных комнат</div>
   </div>
-  
   <div id="room-details" style="display: none;">
     <h3 id="room-name"></h3>
     <div id="players-list"></div>
@@ -29,41 +27,24 @@
     </div>
     <div id="game-status"></div>
   </div>
-  
-  <div id="version">Build 1.4v (FixedSystem)</div>
+  <div id="version">Build 1.3v (FixedSystem)</div>
 </div>
-
-<!-- Нижнее меню -->
-<div id="panel">
-  <div class="tab-buttons">
-    <button class="tab-button" onclick="window.location.href='index.html'">Профиль</button>
-    <button class="tab-button" onclick="window.location.href='index.html#shop'">Магазин</button>
-    <button class="tab-button active" onclick="window.location.href='pvp-game.html'">PVP</button>
-  </div>
-</div>
-
+<script src="scripts/panel.js"></script>
 <script>
-// Инициализация Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
   databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
 };
-
 const app = firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-
-// Текущий игрок
 const currentPlayer = {
   id: window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 'player_' + Math.random().toString(36).slice(2, 9),
   name: window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || 'Игрок',
   ready: false
 };
-
 let currentRoomId = null;
 let currentRoomRef = null;
 let roomsRef = db.ref('rooms');
-
-// Элементы интерфейса
 const roomsList = document.getElementById('rooms-list');
 const roomDetails = document.getElementById('room-details');
 const roomName = document.getElementById('room-name');
@@ -73,14 +54,11 @@ const createRoomBtn = document.getElementById('create-room-btn');
 const readyBtn = document.getElementById('ready-btn');
 const leaveRoomBtn = document.getElementById('leave-room-btn');
 
-// Инициализация
 function initPVPRoomSystem() {
   createRoomBtn.addEventListener('click', showCreateRoomModal);
   readyBtn.addEventListener('click', toggleReadyStatus);
   leaveRoomBtn.addEventListener('click', leaveRoom);
-  
   loadRooms();
-  
   roomsRef.on('value', (snapshot) => {
     updateRoomsList(snapshot);
   }, (error) => {
@@ -88,7 +66,6 @@ function initPVPRoomSystem() {
   });
 }
 
-// Показать модальное окно создания комнаты
 function showCreateRoomModal() {
   const modal = document.createElement('div');
   modal.className = 'modal';
@@ -113,26 +90,21 @@ function showCreateRoomModal() {
       </div>
     </div>
   `;
-  
   document.body.appendChild(modal);
-  
   document.getElementById('confirm-create').addEventListener('click', () => {
     const name = document.getElementById('room-name-input').value.trim() || 'Моя комната';
     const maxPlayers = parseInt(document.getElementById('max-players').value);
     createRoom(name, maxPlayers);
     modal.remove();
   });
-  
   document.getElementById('cancel-create').addEventListener('click', () => {
     modal.remove();
   });
 }
 
-// Создать новую комнату
 function createRoom(name, maxPlayers) {
   currentRoomId = roomsRef.push().key;
   currentRoomRef = db.ref(`rooms/${currentRoomId}`);
-  
   const roomData = {
     name: name,
     maxPlayers: maxPlayers,
@@ -146,7 +118,6 @@ function createRoom(name, maxPlayers) {
     createdAt: firebase.database.ServerValue.TIMESTAMP,
     creator: currentPlayer.id
   };
-  
   currentRoomRef.set(roomData)
     .then(() => {
       joinRoom(currentRoomId, true);
@@ -157,7 +128,6 @@ function createRoom(name, maxPlayers) {
     });
 }
 
-// Загрузить список комнат
 function loadRooms() {
   roomsRef.once('value')
     .then(snapshot => {
@@ -168,27 +138,20 @@ function loadRooms() {
     });
 }
 
-// Обновить список комнат
 function updateRoomsList(snapshot) {
   roomsList.innerHTML = '';
-  
   if (!snapshot.exists()) {
     roomsList.innerHTML = '<div class="empty-message">Нет доступных комнат</div>';
     return;
   }
-  
   const rooms = snapshot.val();
   let hasAvailableRooms = false;
-  
   Object.entries(rooms).forEach(([roomId, room]) => {
     if (!room) return;
-    
     const playerCount = Object.keys(room.players || {}).length;
     const isAvailable = room.status === 'waiting' && playerCount < (room.maxPlayers || 2);
-    
     if (isAvailable) {
       hasAvailableRooms = true;
-      
       const roomCard = document.createElement('div');
       roomCard.className = 'room-card';
       roomCard.innerHTML = `
@@ -199,55 +162,45 @@ function updateRoomsList(snapshot) {
           <span>${getRoomStatus(room)}</span>
         </div>
       `;
-      
       roomCard.addEventListener('click', () => {
         if (roomId !== currentRoomId) {
           joinRoom(roomId);
         }
       });
-      
       roomsList.appendChild(roomCard);
     }
   });
-  
   if (!hasAvailableRooms) {
     roomsList.innerHTML = '<div class="empty-message">Нет доступных комнат</div>';
   }
 }
 
-// Присоединиться к комнате
 function joinRoom(roomId, isCreator = false) {
   if (currentRoomId && currentRoomId !== roomId) {
     leaveRoom();
   }
-  
   currentRoomId = roomId;
   currentRoomRef = db.ref(`rooms/${roomId}`);
-  
   if (isCreator) {
     setupRoomListeners();
     showRoomDetails();
   } else {
     currentRoomRef.transaction(room => {
       if (!room) return null;
-      
       const playerCount = Object.keys(room.players || {}).length;
       if (playerCount >= (room.maxPlayers || 2)) {
         alert("Комната уже заполнена");
         return;
       }
-      
       if (!room.players) {
         room.players = {};
       }
-      
       if (!room.players[currentPlayer.id]) {
         room.players[currentPlayer.id] = {
           name: currentPlayer.name,
           ready: false
         };
       }
-      
       return room;
     })
     .then(() => {
@@ -262,7 +215,6 @@ function joinRoom(roomId, isCreator = false) {
   }
 }
 
-// Настроить слушатели комнаты
 function setupRoomListeners() {
   currentRoomRef.on('value', snapshot => {
     const room = snapshot.val();
@@ -272,9 +224,7 @@ function setupRoomListeners() {
       hideRoomDetails();
       return;
     }
-    
     updateRoomDetails(room);
-    
     if (room.status === 'waiting' && allPlayersReady(room)) {
       startGame();
     }
@@ -283,14 +233,12 @@ function setupRoomListeners() {
   });
 }
 
-// Показать детали комнаты
 function showRoomDetails() {
   document.getElementById('pvp-container').querySelector('.header').style.display = 'none';
   roomsList.style.display = 'none';
   roomDetails.style.display = 'block';
 }
 
-// Скрыть детали комнаты
 function hideRoomDetails() {
   document.getElementById('pvp-container').querySelector('.header').style.display = 'flex';
   roomsList.style.display = 'grid';
@@ -298,11 +246,9 @@ function hideRoomDetails() {
   loadRooms();
 }
 
-// Обновить детали комнаты
 function updateRoomDetails(room) {
   roomName.textContent = room.name || 'Без названия';
   playersList.innerHTML = '';
-  
   Object.entries(room.players || {}).forEach(([playerId, player]) => {
     const playerItem = document.createElement('div');
     playerItem.className = 'player-item';
@@ -312,7 +258,6 @@ function updateRoomDetails(room) {
     `;
     playersList.appendChild(playerItem);
   });
-  
   if (room.status === 'waiting') {
     gameStatus.textContent = 'Ожидание игроков...';
     readyBtn.style.display = 'inline-block';
@@ -326,10 +271,8 @@ function updateRoomDetails(room) {
   }
 }
 
-// Переключить статус готовности
 function toggleReadyStatus() {
   currentPlayer.ready = !currentPlayer.ready;
-  
   currentRoomRef.child(`players/${currentPlayer.id}/ready`).set(currentPlayer.ready)
     .then(() => {
       readyBtn.textContent = currentPlayer.ready ? 'Не готов' : 'Готов';
@@ -339,12 +282,10 @@ function toggleReadyStatus() {
     });
 }
 
-// Все ли игроки готовы
 function allPlayersReady(room) {
   return Object.values(room.players || {}).every(player => player.ready);
 }
 
-// Начать игру
 function startGame() {
   currentRoomRef.update({ status: 'playing' })
     .then(() => {
@@ -357,18 +298,14 @@ function startGame() {
     });
 }
 
-// Завершить игру
 function finishGame() {
   currentRoomRef.once('value')
     .then(snapshot => {
       const room = snapshot.val();
       if (!room) return;
-      
       const players = Object.keys(room.players || {});
       if (players.length === 0) return;
-      
       const winnerId = players[Math.floor(Math.random() * players.length)];
-      
       return currentRoomRef.update({
         status: 'finished',
         winner: winnerId,
@@ -380,29 +317,21 @@ function finishGame() {
     });
 }
 
-// Покинуть комнату
 function leaveRoom() {
   if (!currentRoomId || !currentRoomRef) {
     hideRoomDetails();
     return;
   }
-  
   const roomRef = currentRoomRef;
-  
   roomRef.transaction(room => {
     if (!room) return null;
-    
-    // Удаляем текущего игрока из комнаты
     if (room.players && room.players[currentPlayer.id]) {
       delete room.players[currentPlayer.id];
     }
-    
-    // Если выходит создатель комнаты, назначаем нового создателя
     if (room.creator === currentPlayer.id && Object.keys(room.players || {}).length > 0) {
       const remainingPlayers = Object.keys(room.players);
-      room.creator = remainingPlayers[0]; // Назначаем первого оставшегося игрока создателем
+      room.creator = remainingPlayers[0];
     }
-    
     return room;
   })
   .then(() => {
@@ -416,7 +345,6 @@ function leaveRoom() {
   });
 }
 
-// Вспомогательные функции
 function formatTime(timestamp) {
   if (!timestamp) return '';
   const date = new Date(timestamp);
@@ -430,7 +358,6 @@ function getRoomStatus(room) {
   return 'Ожидание';
 }
 
-// Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', initPVPRoomSystem);
 </script>
 </body>
