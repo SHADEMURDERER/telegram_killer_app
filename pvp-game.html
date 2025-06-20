@@ -30,7 +30,7 @@
     <div id="game-status"></div>
   </div>
   
-  <div id="version">Build 1.3v (Room System)</div>
+  <div id="version">Build 1.3v (FixedSystem)</div>
 </div>
 
 <!-- Нижнее меню -->
@@ -49,7 +49,6 @@ const firebaseConfig = {
   databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
 };
 
-// Инициализация приложения
 const app = firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
@@ -85,7 +84,7 @@ function initPVPRoomSystem() {
   roomsRef.on('value', (snapshot) => {
     updateRoomsList(snapshot);
   }, (error) => {
-    console.log("Ошибка чтения комнат:", error);
+    console.error("Ошибка чтения комнат:", error);
   });
 }
 
@@ -144,12 +143,14 @@ function createRoom(name, maxPlayers) {
       }
     },
     status: 'waiting',
-    createdAt: firebase.database.ServerValue.TIMESTAMP
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    creator: currentPlayer.id // Добавляем создателя комнаты
   };
   
   currentRoomRef.set(roomData)
     .then(() => {
-      joinRoom(currentRoomId);
+      // Сразу переходим в созданную комнату
+      joinRoom(currentRoomId, true);
     })
     .catch(error => {
       console.error("Ошибка создания комнаты:", error);
@@ -181,9 +182,13 @@ function updateRoomsList(snapshot) {
   let hasAvailableRooms = false;
   
   Object.entries(rooms).forEach(([roomId, room]) => {
-    if (room && room.status === 'waiting' && Object.keys(room.players || {}).length < (room.maxPlayers || 2)) {
+    if (!room) return;
+    
+    const playerCount = Object.keys(room.players || {}).length;
+    const isAvailable = room.status === 'waiting' && playerCount < (room.maxPlayers || 2);
+    
+    if (isAvailable) {
       hasAvailableRooms = true;
-      const playerCount = Object.keys(room.players || {}).length;
       
       const roomCard = document.createElement('div');
       roomCard.className = 'room-card';
@@ -197,7 +202,9 @@ function updateRoomsList(snapshot) {
       `;
       
       roomCard.addEventListener('click', () => {
-        joinRoom(roomId);
+        if (roomId !== currentRoomId) {
+          joinRoom(roomId);
+        }
       });
       
       roomsList.appendChild(roomCard);
@@ -209,43 +216,53 @@ function updateRoomsList(snapshot) {
   }
 }
 
-// Присоединиться к комнате
-function joinRoom(roomId) {
-  if (currentRoomId) return;
+// Присоединиться к комнате (isCreator - флаг создателя комнаты)
+function joinRoom(roomId, isCreator = false) {
+  if (currentRoomId && currentRoomId !== roomId) {
+    leaveRoom(); // Выходим из текущей комнаты перед присоединением к новой
+  }
   
   currentRoomId = roomId;
   currentRoomRef = db.ref(`rooms/${roomId}`);
   
-  currentRoomRef.transaction(room => {
-    if (!room) return null;
-    
-    if (Object.keys(room.players || {}).length >= (room.maxPlayers || 2)) {
-      alert("Комната уже заполнена");
-      return;
-    }
-    
-    if (!room.players) {
-      room.players = {};
-    }
-    
-    if (!room.players[currentPlayer.id]) {
-      room.players[currentPlayer.id] = {
-        name: currentPlayer.name,
-        ready: false
-      };
-    }
-    
-    return room;
-  })
-  .then(() => {
+  if (isCreator) {
+    // Для создателя комнаты - сразу показываем комнату
     setupRoomListeners();
     showRoomDetails();
-  })
-  .catch(error => {
-    console.error("Ошибка присоединения к комнате:", error);
-    currentRoomId = null;
-    currentRoomRef = null;
-  });
+  } else {
+    // Для присоединяющегося игрока - добавляем в список игроков
+    currentRoomRef.transaction(room => {
+      if (!room) return null;
+      
+      const playerCount = Object.keys(room.players || {}).length;
+      if (playerCount >= (room.maxPlayers || 2)) {
+        alert("Комната уже заполнена");
+        return;
+      }
+      
+      if (!room.players) {
+        room.players = {};
+      }
+      
+      if (!room.players[currentPlayer.id]) {
+        room.players[currentPlayer.id] = {
+          name: currentPlayer.name,
+          ready: false
+        };
+      }
+      
+      return room;
+    })
+    .then(() => {
+      setupRoomListeners();
+      showRoomDetails();
+    })
+    .catch(error => {
+      console.error("Ошибка присоединения к комнате:", error);
+      currentRoomId = null;
+      currentRoomRef = null;
+    });
+  }
 }
 
 // Настроить слушатели комнаты
@@ -253,6 +270,7 @@ function setupRoomListeners() {
   currentRoomRef.on('value', snapshot => {
     const room = snapshot.val();
     if (!room) {
+      // Комната была удалена
       currentRoomId = null;
       currentRoomRef = null;
       hideRoomDetails();
@@ -261,11 +279,23 @@ function setupRoomListeners() {
     
     updateRoomDetails(room);
     
+    // Проверяем, пустая ли комната
+    if (Object.keys(room.players || {}).length === 0) {
+      // Удаляем пустую комнату
+      currentRoomRef.remove()
+        .then(() => {
+          currentRoomId = null;
+          currentRoomRef = null;
+          hideRoomDetails();
+        });
+      return;
+    }
+    
     if (room.status === 'waiting' && allPlayersReady(room)) {
       startGame();
     }
   }, (error) => {
-    console.error("Firebase room listener error:", error);
+    console.error("Ошибка слушателя комнаты:", error);
   });
 }
 
@@ -281,6 +311,7 @@ function hideRoomDetails() {
   document.getElementById('pvp-container').querySelector('.header').style.display = 'flex';
   roomsList.style.display = 'grid';
   roomDetails.style.display = 'none';
+  loadRooms(); // Обновляем список комнат
 }
 
 // Обновить детали комнаты
@@ -371,14 +402,17 @@ function leaveRoom() {
   
   currentRoomRef.child(`players/${currentPlayer.id}`).remove()
     .then(() => {
-      currentRoomRef.once('value')
-        .then(snapshot => {
-          const room = snapshot.val();
-          if (room && Object.keys(room.players || {}).length === 0) {
-            currentRoomRef.remove();
-          }
-        });
-      
+      // Проверяем, пустая ли комната после выхода
+      return currentRoomRef.once('value');
+    })
+    .then(snapshot => {
+      const room = snapshot.val();
+      if (!room || Object.keys(room.players || {}).length === 0) {
+        // Удаляем пустую комнату
+        return currentRoomRef.remove();
+      }
+    })
+    .then(() => {
       currentRoomId = null;
       currentRoomRef = null;
       currentPlayer.ready = false;
