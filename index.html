@@ -6,6 +6,10 @@
   <title>Gizmo App</title>
   <link rel="stylesheet" href="styles/main.css">
   <link rel="stylesheet" href="styles/animation.css">
+  <link rel="stylesheet" href="styles/panel.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 </head>
 <body>
 <div id="ring-container">
@@ -22,6 +26,10 @@
     
     <div id="profile" class="tab-content active">
       <h2>Добро пожаловать, <span id="username">Игрок</span>!</h2>
+      <p>Ваш Telegram: <span id="user-telegram">@username</span></p>
+      <p>Ваш ник: <span id="user-nickname">Гость</span></p>
+      <input type="text" id="nickname-input" placeholder="Новый ник">
+      <button onclick="updateNickname()">Изменить ник</button>
       <p>Ваш статус: Новичок</p>
     </div>
     
@@ -29,26 +37,43 @@
       <div class="shop-item">
         <h3>🗡️ Меч Дракона</h3>
         <p style="color: #f8d56b;">100 золотых</p>
+        <button class="buy-btn" data-item="dragon_sword">Купить</button>
       </div>
       <div class="shop-item">
         <h3>🛡️ Щит Рыцаря</h3>
         <p style="color: #f8d56b;">75 золотых</p>
+        <button class="buy-btn" data-item="knight_shield">Купить</button>
       </div>
     </div>
   </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script src="scripts/main.js"></script>
+<script src="scripts/animation.js"></script>
+<script src="scripts/shop.js"></script>
 <script>
+  // Инициализация Firebase
   const firebaseConfig = {
     apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
     databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
   };
   
-
   const app = firebase.initializeApp(firebaseConfig);
   window.db = firebase.database(app);
+  
+  // Инициализация магазина
+  document.querySelectorAll('.buy-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const item = this.getAttribute('data-item');
+      purchaseItem(item);
+    });
+  });
+  
+  function purchaseItem(itemId) {
+    // Здесь должна быть логика покупки
+    alert(`Покупка: ${itemId}`);
+    // В реальном приложении здесь будет запрос к Firebase
+  }
 </script>
 </body>
 </html>

@@ -4,18 +4,22 @@ document.addEventListener('DOMContentLoaded', () => {
     el.style.willChange = 'transform, opacity, filter';
   });
   
+  // Первая часть анимации - появление и вращение
   setTimeout(() => {
     const ring = document.getElementById('ring');
     if (ring) {
       ring.style.animation = 'none';
       ring.style.animation = 'flyThrough 2s ease-out forwards';
       
+      // Вторая часть - исчезновение
       setTimeout(() => {
         const container = document.getElementById('ring-container');
         if (container) {
           container.style.opacity = '0';
           setTimeout(() => {
             container.remove();
+            // Показываем контент после анимации
+            document.getElementById('content').style.opacity = '1';
           }, 1000);
         }
       }, 2000);
