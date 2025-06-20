@@ -172,7 +172,6 @@ function resetGame(initial = false) {
     }).catch(console.error);
   }
   
-  // Не удаляем игроков при сбросе, только при выходе по таймауту
   gameState.usedColors = [];
   gameState.winner = null;
   gameState.status = 'waiting';
@@ -189,6 +188,8 @@ function resetGame(initial = false) {
 
 // Начало отсчета времени ставок
 function startBettingTimer() {
+  if (gameState.status !== 'waiting') return;
+  
   gameRef.update({
     status: 'betting',
     startTime: getServerTime()
@@ -248,7 +249,10 @@ function updateGameState(game) {
     timerDisplay.style.display = 'none';
   } else if (game.status === 'finished') {
     showWinner(game.winner);
-    setTimeout(resetGame, 10000);
+    setTimeout(() => {
+      resetGame();
+      playersRef.remove(); // Очищаем всех игроков после завершения игры
+    }, 10000);
   }
 }
 
@@ -337,9 +341,7 @@ function startRoulette() {
       rouletteSlotsWrapper.style.transform = `translateX(-${targetPosition}%)`;
       
       setTimeout(() => {
-        const winnerId = Object.keys(gameState.players).find(key => 
-          gameState.players[key].lastActive >= Date.now() - 30000
-        )[winnerIndex];
+        const winnerId = Object.keys(gameState.players)[winnerIndex];
         
         gameRef.update({
           status: 'finished',
