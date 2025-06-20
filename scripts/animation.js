@@ -1,13 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const elements = document.querySelectorAll('#ring, #title');
-  elements.forEach(el => {
-    el.style.willChange = 'transform, opacity, filter';
-  });
-  
   setTimeout(() => {
     const ring = document.getElementById('ring');
-    if (ring) {
-      ring.style.animation = 'flyThrough 2s ease-out forwards';
+    const title = document.getElementById('title');
+    
+    if (ring && title) {
+      // Анимация завершения
+      ring.style.animation = 'zoomOut 2s ease-in forwards';
+      title.style.animation = 'fadeOut 1s ease-in forwards';
       
       setTimeout(() => {
         const container = document.getElementById('ring-container');
@@ -15,10 +14,11 @@ document.addEventListener('DOMContentLoaded', () => {
           container.style.opacity = '0';
           setTimeout(() => {
             container.remove();
-            document.getElementById('content').classList.add('visible');
+            document.getElementById('content').style.display = 'block';
+            initMenu();
           }, 1000);
         }
       }, 2000);
     }
-  }, 4000);
+  }, 6000);
 });

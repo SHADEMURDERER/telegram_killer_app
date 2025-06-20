@@ -1,9 +1,3 @@
-let currentPlayer = {
-  id: null,
-  name: 'Гость',
-  username: '@username'
-};
-
 function initMenu() {
   const menuHTML = `
     <div id="main-menu">
@@ -25,11 +19,6 @@ function initMenu() {
   `;
   
   document.body.insertAdjacentHTML('beforeend', menuHTML);
-
-  const savedPlayer = sessionStorage.getItem('currentPlayer');
-  if (savedPlayer) {
-    currentPlayer = JSON.parse(savedPlayer);
-  }
 
   setTimeout(() => {
     const buttons = document.querySelectorAll('.menu-btn');
@@ -122,5 +111,3 @@ function updateNickname() {
     document.querySelector('#profile-panel h2').textContent = newNickname;
   }
 }
-
-document.addEventListener('DOMContentLoaded', initMenu);
