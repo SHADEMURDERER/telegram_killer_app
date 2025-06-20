@@ -29,7 +29,7 @@
     </div>
   </div>
   
-  <div id="version">Build 4.2v (Stable)</div>
+  <div id="version">Build 4.3v (Fixed)</div>
 </div>
 
 <div id="panel">
@@ -69,7 +69,7 @@ const gameState = {
   slotWidth: 0,
   serverTimeOffset: 0,
   isPlacingBet: false,
-  currentRoomPlayers: {} // Добавлено для хранения текущих игроков
+  currentRoom: null
 };
 
 // Элементы интерфейса
@@ -106,9 +106,10 @@ function initRouletteGame() {
     try {
       const room = snapshot.val();
       if (room) {
-        // Сохраняем текущих игроков в gameState
-        gameState.currentRoomPlayers = room.players || {};
+        gameState.currentRoom = room;
         updateGameUI(room);
+      } else {
+        resetRoom();
       }
     } catch (error) {
       console.error('Ошибка обработки комнаты:', error);
@@ -136,8 +137,7 @@ function resetRoom() {
 // Размещение ставки
 async function placeBet() {
   try {
-    const snapshot = await roomRef.once('value');
-    const room = snapshot.val();
+    const room = gameState.currentRoom;
     if (!room) {
       await resetRoom();
       return;
@@ -292,17 +292,20 @@ function updateGameUI(room) {
     }
     
     // Обновляем отображение рулетки
-    updateRouletteDisplay(room.players || {});
+    updateRouletteDisplay(room);
   } catch (error) {
     console.error('Ошибка обновления интерфейса:', error);
   }
 }
 
 // Обновление отображения рулетки
-function updateRouletteDisplay(players) {
+function updateRouletteDisplay(room) {
   try {
     rouletteSlots.innerHTML = '';
-    const activePlayers = Object.values(players).filter(p => p?.color);
+    
+    if (!room.players) return;
+    
+    const activePlayers = Object.values(room.players).filter(p => p?.color);
     const totalPlayers = activePlayers.length;
     
     if (totalPlayers === 0) return;
@@ -320,7 +323,7 @@ function updateRouletteDisplay(players) {
   }
 }
 
-// Создание слота (исправленная версия)
+// Создание слота
 function createSlot(player, index, totalPlayers) {
   try {
     const slot = document.createElement('div');
@@ -331,7 +334,7 @@ function createSlot(player, index, totalPlayers) {
     
     const percent = document.createElement('div');
     percent.className = 'slot-percent';
-    percent.textContent = `${Math.round(100 / totalPlayers)}%`; // Используем переданный totalPlayers
+    percent.textContent = `${Math.round(100 / totalPlayers)}%`;
     percent.style.color = getContrastColor(player.color);
     
     slot.appendChild(percent);
