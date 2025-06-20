@@ -29,7 +29,7 @@
     </div>
   </div>
   
-  <div id="version">Build 4.1v (Stable Room System)</div>
+  <div id="version">Build 4.2v (Stable)</div>
 </div>
 
 <div id="panel">
@@ -68,7 +68,8 @@ const gameState = {
   colors: ['#FF5252', '#4CAF50', '#2196F3', '#FFC107', '#9C27B0', '#00BCD4'],
   slotWidth: 0,
   serverTimeOffset: 0,
-  isPlacingBet: false
+  isPlacingBet: false,
+  currentRoomPlayers: {} // Добавлено для хранения текущих игроков
 };
 
 // Элементы интерфейса
@@ -105,6 +106,8 @@ function initRouletteGame() {
     try {
       const room = snapshot.val();
       if (room) {
+        // Сохраняем текущих игроков в gameState
+        gameState.currentRoomPlayers = room.players || {};
         updateGameUI(room);
       }
     } catch (error) {
@@ -153,7 +156,7 @@ async function placeBet() {
     }
 
     // Выбираем уникальный цвет
-    const usedColors = room.players ? Object.values(room.players).map(p => p.color) : [];
+    const usedColors = room.players ? Object.values(room.players).map(p => p?.color).filter(Boolean) : [];
     let availableColors = gameState.colors.filter(c => !usedColors.includes(c));
     if (availableColors.length === 0) {
       availableColors = gameState.colors;
@@ -195,7 +198,7 @@ function startBettingTimer() {
 
 // Запуск рулетки
 function startRoulette(room) {
-  const activePlayers = room.players ? Object.entries(room.players) : [];
+  const activePlayers = room.players ? Object.entries(room.players).filter(([_, p]) => p?.color) : [];
   if (activePlayers.length < 2) {
     return resetRoom();
   }
@@ -299,7 +302,7 @@ function updateGameUI(room) {
 function updateRouletteDisplay(players) {
   try {
     rouletteSlots.innerHTML = '';
-    const activePlayers = Object.values(players);
+    const activePlayers = Object.values(players).filter(p => p?.color);
     const totalPlayers = activePlayers.length;
     
     if (totalPlayers === 0) return;
@@ -308,8 +311,8 @@ function updateRouletteDisplay(players) {
     
     activePlayers.forEach((player, index) => {
       if (player && player.color) {
-        createSlot(player, index);
-        if (index === 0) createSlot(player, -1); // Дублирование для бесконечности
+        createSlot(player, index, totalPlayers);
+        if (index === 0) createSlot(player, -1, totalPlayers); // Дублирование для бесконечности
       }
     });
   } catch (error) {
@@ -317,8 +320,8 @@ function updateRouletteDisplay(players) {
   }
 }
 
-// Создание слота
-function createSlot(player, index) {
+// Создание слота (исправленная версия)
+function createSlot(player, index, totalPlayers) {
   try {
     const slot = document.createElement('div');
     slot.className = 'roulette-slot';
@@ -328,7 +331,7 @@ function createSlot(player, index) {
     
     const percent = document.createElement('div');
     percent.className = 'slot-percent';
-    percent.textContent = `${Math.round(100 / Object.keys(gameState.players).length)}%`;
+    percent.textContent = `${Math.round(100 / totalPlayers)}%`; // Используем переданный totalPlayers
     percent.style.color = getContrastColor(player.color);
     
     slot.appendChild(percent);
