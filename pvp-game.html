@@ -30,7 +30,7 @@
     <div id="game-status"></div>
   </div>
   
-  <div id="version">Build 1.3v (FixedSystem)</div>
+  <div id="version">Build 1.4v (FixedSystem)</div>
 </div>
 
 <!-- Нижнее меню -->
@@ -144,12 +144,11 @@ function createRoom(name, maxPlayers) {
     },
     status: 'waiting',
     createdAt: firebase.database.ServerValue.TIMESTAMP,
-    creator: currentPlayer.id // Добавляем создателя комнаты
+    creator: currentPlayer.id
   };
   
   currentRoomRef.set(roomData)
     .then(() => {
-      // Сразу переходим в созданную комнату
       joinRoom(currentRoomId, true);
     })
     .catch(error => {
@@ -216,21 +215,19 @@ function updateRoomsList(snapshot) {
   }
 }
 
-// Присоединиться к комнате (isCreator - флаг создателя комнаты)
+// Присоединиться к комнате
 function joinRoom(roomId, isCreator = false) {
   if (currentRoomId && currentRoomId !== roomId) {
-    leaveRoom(); // Выходим из текущей комнаты перед присоединением к новой
+    leaveRoom();
   }
   
   currentRoomId = roomId;
   currentRoomRef = db.ref(`rooms/${roomId}`);
   
   if (isCreator) {
-    // Для создателя комнаты - сразу показываем комнату
     setupRoomListeners();
     showRoomDetails();
   } else {
-    // Для присоединяющегося игрока - добавляем в список игроков
     currentRoomRef.transaction(room => {
       if (!room) return null;
       
@@ -270,7 +267,6 @@ function setupRoomListeners() {
   currentRoomRef.on('value', snapshot => {
     const room = snapshot.val();
     if (!room) {
-      // Комната была удалена
       currentRoomId = null;
       currentRoomRef = null;
       hideRoomDetails();
@@ -278,18 +274,6 @@ function setupRoomListeners() {
     }
     
     updateRoomDetails(room);
-    
-    // Проверяем, пустая ли комната
-    if (Object.keys(room.players || {}).length === 0) {
-      // Удаляем пустую комнату
-      currentRoomRef.remove()
-        .then(() => {
-          currentRoomId = null;
-          currentRoomRef = null;
-          hideRoomDetails();
-        });
-      return;
-    }
     
     if (room.status === 'waiting' && allPlayersReady(room)) {
       startGame();
@@ -311,7 +295,7 @@ function hideRoomDetails() {
   document.getElementById('pvp-container').querySelector('.header').style.display = 'flex';
   roomsList.style.display = 'grid';
   roomDetails.style.display = 'none';
-  loadRooms(); // Обновляем список комнат
+  loadRooms();
 }
 
 // Обновить детали комнаты
@@ -398,29 +382,38 @@ function finishGame() {
 
 // Покинуть комнату
 function leaveRoom() {
-  if (!currentRoomId) return;
+  if (!currentRoomId || !currentRoomRef) {
+    hideRoomDetails();
+    return;
+  }
   
-  currentRoomRef.child(`players/${currentPlayer.id}`).remove()
-    .then(() => {
-      // Проверяем, пустая ли комната после выхода
-      return currentRoomRef.once('value');
-    })
-    .then(snapshot => {
-      const room = snapshot.val();
-      if (!room || Object.keys(room.players || {}).length === 0) {
-        // Удаляем пустую комнату
-        return currentRoomRef.remove();
-      }
-    })
-    .then(() => {
-      currentRoomId = null;
-      currentRoomRef = null;
-      currentPlayer.ready = false;
-      hideRoomDetails();
-    })
-    .catch(error => {
-      console.error("Ошибка выхода из комнаты:", error);
-    });
+  const roomRef = currentRoomRef;
+  
+  roomRef.transaction(room => {
+    if (!room) return null;
+    
+    // Удаляем текущего игрока из комнаты
+    if (room.players && room.players[currentPlayer.id]) {
+      delete room.players[currentPlayer.id];
+    }
+    
+    // Если выходит создатель комнаты, назначаем нового создателя
+    if (room.creator === currentPlayer.id && Object.keys(room.players || {}).length > 0) {
+      const remainingPlayers = Object.keys(room.players);
+      room.creator = remainingPlayers[0]; // Назначаем первого оставшегося игрока создателем
+    }
+    
+    return room;
+  })
+  .then(() => {
+    currentRoomId = null;
+    currentRoomRef = null;
+    currentPlayer.ready = false;
+    hideRoomDetails();
+  })
+  .catch(error => {
+    console.error("Ошибка выхода из комнаты:", error);
+  });
 }
 
 // Вспомогательные функции
