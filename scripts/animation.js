@@ -1,34 +1,35 @@
 document.addEventListener('DOMContentLoaded', () => {
   // Инициализация анимации
-  const ring = document.getElementById('ring');
-  const title = document.getElementById('title');
-  const ringContainer = document.getElementById('ring-container');
-
-  if (ring && title && ringContainer) {
-    // После завершения всех анимаций
-    setTimeout(() => {
-      ringContainer.style.opacity = '0';
+  setTimeout(() => {
+    const ring = document.getElementById('ring');
+    const title = document.getElementById('title');
+    const container = document.getElementById('ring-container');
+    
+    if (ring && title && container) {
       setTimeout(() => {
-        ringContainer.remove();
-        initMenu();
-      }, 1000);
-    }, 5000);
-  }
+        container.style.opacity = '0';
+        setTimeout(() => {
+          container.remove();
+          initMenu();
+        }, 1000);
+      }, 6000);
+    }
+  }, 100);
 });
 
 function initMenu() {
   const menuHTML = `
     <div id="main-menu">
       <div class="menu-buttons">
-        <button class="menu-btn profile-btn">
+        <button class="menu-btn profile-btn" id="profile-btn">
           <span class="btn-icon">👤</span>
           <span class="btn-text">Профиль</span>
         </button>
-        <button class="menu-btn shop-btn">
+        <button class="menu-btn shop-btn" id="shop-btn">
           <span class="btn-icon">🛒</span>
           <span class="btn-text">Магазин</span>
         </button>
-        <button class="menu-btn pvp-btn">
+        <button class="menu-btn pvp-btn" id="pvp-btn">
           <span class="btn-icon">⚔️</span>
           <span class="btn-text">PVP</span>
         </button>
@@ -39,9 +40,9 @@ function initMenu() {
   document.body.insertAdjacentHTML('beforeend', menuHTML);
 
   // Обработчики кнопок
-  document.querySelector('.profile-btn').addEventListener('click', showProfile);
-  document.querySelector('.shop-btn').addEventListener('click', showShop);
-  document.querySelector('.pvp-btn').addEventListener('click', () => {
+  document.getElementById('profile-btn').addEventListener('click', showProfile);
+  document.getElementById('shop-btn').addEventListener('click', showShop);
+  document.getElementById('pvp-btn').addEventListener('click', () => {
     window.location.href = 'pvp-game.html';
   });
 }
@@ -55,8 +56,8 @@ function showProfile() {
           <p class="telegram-username">${currentPlayer.username}</p>
         </div>
         <div class="nickname-edit">
-          <input type="text" id="nickname-input" placeholder="Введите новый никнейм" value="${currentPlayer.name}">
-          <button id="update-nickname-btn">Сохранить</button>
+          <input type="text" id="nickname-input" placeholder="Новый ник" value="${currentPlayer.name}">
+          <button id="update-nickname-btn">Изменить</button>
         </div>
       </div>
     </div>
@@ -66,6 +67,11 @@ function showProfile() {
   const panel = document.getElementById('profile-panel');
   setTimeout(() => {
     panel.classList.add('active');
+    
+    // Позиционируем стрелку
+    const profileBtn = document.getElementById('profile-btn');
+    const btnRect = profileBtn.getBoundingClientRect();
+    panel.style.setProperty('--arrow-pos', `${btnRect.left + btnRect.width/2}px`);
   }, 10);
   
   document.getElementById('update-nickname-btn').addEventListener('click', updateNickname);
@@ -101,6 +107,11 @@ function showShop() {
   const panel = document.getElementById('shop-panel');
   setTimeout(() => {
     panel.classList.add('active');
+    
+    // Позиционируем стрелку
+    const shopBtn = document.getElementById('shop-btn');
+    const btnRect = shopBtn.getBoundingClientRect();
+    panel.style.setProperty('--arrow-pos', `${btnRect.left + btnRect.width/2}px`);
   }, 10);
   
   // Закрытие при клике вне панели

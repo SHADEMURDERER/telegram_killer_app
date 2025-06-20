@@ -2,7 +2,7 @@
   position: fixed;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) translateZ(0);
   width: 100vw;
   height: 100vh;
   display: flex;
@@ -10,37 +10,35 @@
   align-items: center;
   z-index: 1000;
   background-color: #2a2826;
-  overflow: hidden;
+  transform-style: preserve-3d;
 }
 
 #ring {
-  width: 300px;
-  height: 300px;
+  width: 600px;
+  height: 600px;
   background: url('../images/anim.gif') center/contain no-repeat;
   animation: 
-    rotate 3s linear infinite,
-    zoomIn 2.5s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+    rotate 4s linear infinite,
+    initialZoom 2s ease-out forwards,
+    flyThrough 2s 4s ease-out forwards;
   transform-style: preserve-3d;
-  filter: drop-shadow(0 0 20px rgba(127, 90, 240, 0.5));
 }
 
 #title {
   position: absolute;
-  top: 45%;
+  top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 5rem;
-  font-weight: 800;
+  font-size: 4.5rem;
+  font-weight: bold;
   color: white;
-  text-shadow: 0 0 20px rgba(127, 90, 240, 0.8);
+  text-shadow: 0 0 15px rgba(255,255,255,0.7);
   opacity: 0;
+  filter: blur(15px);
   z-index: 1001;
   animation: 
-    titleAppear 1.5s ease-out 2.5s forwards,
-    titleFloat 1s ease-in-out 4s forwards;
-  font-family: 'Arial', sans-serif;
-  letter-spacing: 2px;
-  filter: blur(5px);
+    titleAppear 1.5s 4s ease-out forwards,
+    titleMoveUp 1.5s 6s ease-out forwards;
 }
 
 @keyframes rotate {
@@ -48,130 +46,124 @@
   to { transform: rotate(360deg); }
 }
 
-@keyframes zoomIn {
-  0% { transform: scale(0.1) translateZ(-500px); opacity: 0; }
-  70% { transform: scale(1.2); opacity: 1; }
-  100% { transform: scale(3); opacity: 0; }
+@keyframes initialZoom {
+  0% { transform: scale(0.5); opacity: 0; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes flyThrough {
+  0% { transform: scale(1) translateZ(0); opacity: 1; }
+  100% { transform: scale(5) translateZ(800px); opacity: 0; }
 }
 
 @keyframes titleAppear {
-  0% { 
-    opacity: 0;
-    transform: translate(-50%, -100%);
-    filter: blur(10px);
-  }
-  100% { 
-    opacity: 1;
-    transform: translate(-50%, -50%);
-    filter: blur(0);
-  }
+  0% { opacity: 0; filter: blur(15px); transform: translate(-50%, -50%) scale(0.8); }
+  100% { opacity: 1; filter: blur(0); transform: translate(-50%, -50%) scale(1); }
 }
 
-@keyframes titleFloat {
-  0% { 
-    transform: translate(-50%, -50%);
-    opacity: 1;
-  }
-  100% { 
-    transform: translate(-50%, -80%);
-    opacity: 0.8;
-  }
+@keyframes titleMoveUp {
+  0% { top: 50%; opacity: 1; }
+  100% { top: 20%; opacity: 0.7; }
 }
 
-/* Новые стили для меню */
+/* Меню */
 #main-menu {
   position: fixed;
-  bottom: -150px;
+  bottom: 0;
   left: 0;
   right: 0;
   display: flex;
   justify-content: center;
   z-index: 1002;
-  animation: menuSlideUp 1s ease-out 4s forwards;
+  background: rgba(42,40,38,0.9);
+  backdrop-filter: blur(10px);
+  padding: 15px 0;
+  border-top: 1px solid #7f5af0;
 }
 
 .menu-buttons {
   display: flex;
   gap: 15px;
-  padding: 15px;
-  background: rgba(42, 40, 38, 0.9);
-  backdrop-filter: blur(15px);
-  border-radius: 25px 25px 0 0;
-  box-shadow: 0 -5px 25px rgba(0,0,0,0.3);
-  border-top: 1px solid #7f5af0;
+  max-width: 500px;
+  width: 100%;
+  padding: 0 20px;
 }
 
 .menu-btn {
-  background: linear-gradient(135deg, #7f5af0 0%, #6a4ac9 100%);
+  flex: 1;
+  background: #7f5af0;
   color: white;
   border: none;
-  padding: 15px 25px;
-  border-radius: 12px;
+  border-radius: 8px;
+  padding: 12px 0;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  min-width: 80px;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(127, 90, 240, 0.3);
 }
 
-.menu-btn:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(127, 90, 240, 0.4);
+.menu-btn:disabled {
+  background: #3a3836;
+  color: #777;
+  cursor: not-allowed;
 }
 
-.menu-btn:active {
-  transform: translateY(1px);
+.menu-btn.active {
+  background: #6a4ac9;
+  box-shadow: 0 0 10px rgba(127,90,240,0.5);
 }
 
 .btn-icon {
   font-size: 1.5rem;
+  margin-bottom: 5px;
 }
 
-.btn-text {
-  font-size: 0.9rem;
-}
-
-@keyframes menuSlideUp {
-  0% { bottom: -150px; opacity: 0; }
-  100% { bottom: 0; opacity: 1; }
-}
-
-/* Стили для панелей */
+/* Панели */
 .slide-panel {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(42, 40, 38, 0.98);
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 500px;
+  background: rgba(42,40,38,0.98);
   backdrop-filter: blur(20px);
-  border-radius: 25px 25px 0 0;
+  border-radius: 15px 15px 0 0;
   padding: 20px;
-  z-index: 1003;
+  z-index: 1001;
+  box-shadow: 0 -10px 30px rgba(0,0,0,0.3);
   height: 0;
   overflow: hidden;
-  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-  box-shadow: 0 -10px 30px rgba(0,0,0,0.3);
-  margin: 0 auto;
-  width: 95%;
-  max-width: 500px;
+  transition: all 0.4s cubic-bezier(0.22,1,0.36,1);
 }
 
 .slide-panel.active {
   height: 70vh;
-  padding: 20px;
+}
+
+.slide-panel::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-bottom: 15px solid rgba(42,40,38,0.98);
 }
 
 .panel-content {
+  height: 100%;
+  overflow-y: auto;
   opacity: 0;
   transform: translateY(20px);
   transition: all 0.3s ease 0.2s;
-  height: 100%;
-  overflow-y: auto;
 }
 
 .slide-panel.active .panel-content {
@@ -179,7 +171,7 @@
   transform: translateY(0);
 }
 
-/* Стили для профиля */
+/* Профиль */
 .profile-header {
   text-align: center;
   margin-bottom: 20px;
@@ -188,13 +180,11 @@
 .profile-header h2 {
   font-size: 1.8rem;
   margin-bottom: 5px;
-  color: white;
 }
 
 .telegram-username {
   color: #7f5af0;
-  font-size: 1.1rem;
-  margin-bottom: 20px;
+  font-weight: bold;
 }
 
 .nickname-edit {
@@ -208,9 +198,8 @@
   background: rgba(255,255,255,0.1);
   border: 1px solid #7f5af0;
   border-radius: 8px;
-  padding: 12px;
+  padding: 10px;
   color: white;
-  font-size: 1rem;
 }
 
 .nickname-edit button {
@@ -220,17 +209,11 @@
   border-radius: 8px;
   padding: 0 20px;
   cursor: pointer;
-  font-weight: 600;
-  transition: background 0.3s;
 }
 
-.nickname-edit button:hover {
-  background: #6a4ac9;
-}
-
-/* Стили для магазина */
+/* Магазин */
 .shop-item {
-  background: rgba(58, 56, 54, 0.5);
+  background: rgba(58,56,54,0.5);
   border-radius: 12px;
   padding: 15px;
   margin-bottom: 15px;
@@ -240,12 +223,10 @@
 .shop-item h3 {
   font-size: 1.3rem;
   margin-bottom: 10px;
-  color: white;
 }
 
 .price {
   color: #f8d56b;
-  font-size: 1.1rem;
   margin-bottom: 15px;
 }
 
@@ -254,13 +235,7 @@
   color: white;
   border: none;
   border-radius: 8px;
-  padding: 10px 20px;
+  padding: 10px 0;
   width: 100%;
   cursor: pointer;
-  font-weight: 600;
-  transition: background 0.3s;
-}
-
-.buy-btn:hover {
-  background: #6a4ac9;
 }
