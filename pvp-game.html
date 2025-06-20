@@ -29,7 +29,7 @@
     </div>
   </div>
   
-  <div id="version">Build 2.6v (SyncedRoulette)</div>
+  <div id="version">Build 2.7v (FixedReset)</div>
 </div>
 
 <div id="panel">
@@ -66,7 +66,8 @@ const gameState = {
   colors: ['#FF5252', '#4CAF50', '#2196F3', '#FFC107', '#9C27B0', '#00BCD4'],
   usedColors: [],
   slotWidth: 0,
-  serverTimeOffset: 0
+  serverTimeOffset: 0,
+  lastUpdate: 0
 };
 
 // Элементы интерфейса
@@ -91,12 +92,13 @@ function initRouletteGame() {
   placeBetBtn.addEventListener('click', placeBet);
   
   // Полный сброс игры при загрузке
-  resetGameState(true);
+  resetGame(true);
   
   // Слушаем изменения в игре
   gameRef.on('value', (snapshot) => {
     const game = snapshot.val();
-    if (game) {
+    if (game && game.lastUpdate > gameState.lastUpdate) {
+      gameState.lastUpdate = game.lastUpdate;
       updateGameState(game);
     }
   });
@@ -113,32 +115,35 @@ function getServerTime() {
   return Date.now() + gameState.serverTimeOffset;
 }
 
-// Сброс состояния игры
-function resetGameState(initial = false) {
-  if (initial) {
-    // Полный сброс только при инициализации
-    gameRef.transaction(currentData => {
-      if (currentData === null || initial) {
-        return {
-          status: 'waiting',
-          startTime: null,
-          winner: null,
-          finishTime: null,
-          lastReset: getServerTime()
-        };
-      }
-      return currentData;
-    });
-  }
+// Сброс игры
+function resetGame(initial = false) {
+  const resetData = {
+    status: 'waiting',
+    startTime: null,
+    winner: null,
+    finishTime: null,
+    lastUpdate: getServerTime()
+  };
   
-  // Локальный сброс
-  gameState.usedColors = [];
-  winnerDisplay.textContent = '';
-  placeBetBtn.disabled = false;
-  
-  // Сброс позиции рулетки
-  rouletteSlotsWrapper.style.transition = 'none';
-  rouletteSlotsWrapper.style.transform = 'translateX(0)';
+  gameRef.update(resetData).then(() => {
+    if (!initial) {
+      return playersRef.remove();
+    }
+  }).then(() => {
+    gameState.players = {};
+    gameState.usedColors = [];
+    gameState.winner = null;
+    winnerDisplay.textContent = '';
+    placeBetBtn.disabled = false;
+    timerDisplay.style.display = 'none';
+    
+    // Полный сброс рулетки
+    rouletteSlots.innerHTML = '';
+    rouletteSlotsWrapper.style.transition = 'none';
+    rouletteSlotsWrapper.style.transform = 'translateX(0)';
+  }).catch(error => {
+    console.error('Ошибка сброса игры:', error);
+  });
 }
 
 // Размещение ставки
@@ -214,7 +219,8 @@ function updatePlayers(players) {
   if (Object.keys(players).length >= 2 && gameState.status === 'waiting') {
     gameRef.update({
       status: 'betting',
-      startTime: getServerTime()
+      startTime: getServerTime(),
+      lastUpdate: getServerTime()
     });
   }
 }
@@ -236,13 +242,12 @@ function updateRouletteDisplay() {
   // Создаем дублированные слоты для бесконечной анимации
   players.forEach((player, index) => {
     createSlot(player, index);
-    // Дублируем первый слот для бесшовной анимации
-    if (index === 0) createSlot(player, -1);
+    if (index === 0) createSlot(player, -1); // Дублируем первый слот
   });
 }
 
 // Создание слота рулетки
-function createSlot(player, index, isClone = false) {
+function createSlot(player, index) {
   const slot = document.createElement('div');
   slot.className = 'roulette-slot';
   slot.style.backgroundColor = player.color;
@@ -287,36 +292,33 @@ function updateTimerDisplay() {
 // Запуск рулетки
 function startRoulette() {
   gameRef.update({
-    status: 'spinning'
-  });
-  
-  // Анимация вращения рулетки
-  const spinDuration = 3000 + Math.random() * 4000; // 3-7 секунд
-  const players = Object.values(gameState.players);
-  const winnerIndex = Math.floor(Math.random() * players.length);
-  
-  // Рассчитываем смещение для остановки на победителе
-  const targetPosition = 100 - (winnerIndex * gameState.slotWidth);
-  
-  // Сбрасываем анимацию
-  rouletteSlotsWrapper.style.transition = 'none';
-  rouletteSlotsWrapper.style.transform = 'translateX(0)';
-  
-  // Даем время для применения сброса
-  setTimeout(() => {
-    // Запускаем анимацию
-    rouletteSlotsWrapper.style.transition = `transform ${spinDuration/1000}s cubic-bezier(0.2, 0.1, 0.2, 1)`;
-    rouletteSlotsWrapper.style.transform = `translateX(-${targetPosition}%)`;
+    status: 'spinning',
+    lastUpdate: getServerTime()
+  }).then(() => {
+    // Анимация вращения рулетки
+    const spinDuration = 3000 + Math.random() * 4000; // 3-7 секунд
+    const players = Object.values(gameState.players);
+    const winnerIndex = Math.floor(Math.random() * players.length);
+    const targetPosition = 100 - (winnerIndex * gameState.slotWidth);
+    
+    // Сбрасываем анимацию
+    rouletteSlotsWrapper.style.transition = 'none';
+    rouletteSlotsWrapper.style.transform = 'translateX(0)';
     
     setTimeout(() => {
-      // Фиксируем победителя
-      gameRef.update({
-        status: 'finished',
-        winner: Object.keys(gameState.players)[winnerIndex],
-        finishTime: getServerTime()
-      });
-    }, spinDuration);
-  }, 10);
+      rouletteSlotsWrapper.style.transition = `transform ${spinDuration/1000}s cubic-bezier(0.2, 0.1, 0.2, 1)`;
+      rouletteSlotsWrapper.style.transform = `translateX(-${targetPosition}%)`;
+      
+      setTimeout(() => {
+        gameRef.update({
+          status: 'finished',
+          winner: Object.keys(gameState.players)[winnerIndex],
+          finishTime: getServerTime(),
+          lastUpdate: getServerTime()
+        });
+      }, spinDuration);
+    }, 10);
+  });
 }
 
 // Показать победителя
@@ -329,22 +331,6 @@ function showWinner(winnerId) {
       </div>
     `;
   }
-}
-
-// Полный сброс игры
-function resetGame() {
-  playersRef.remove().then(() => {
-    gameRef.update({
-      status: 'waiting',
-      winner: null,
-      startTime: null,
-      finishTime: null,
-      lastReset: getServerTime()
-    });
-    
-    // Локальный сброс
-    resetGameState();
-  });
 }
 
 // Инициализация при загрузке
