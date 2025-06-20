@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Gizmo PVP</title>
   <link rel="stylesheet" href="styles/pvp-game.css">
+  <link rel="stylesheet" href="styles/animation.css">
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="scripts/menu.js"></script>
 </head>
 <body>
   <div id="pvp-container">
@@ -28,6 +28,20 @@
         <button id="place-bet-btn" class="bet-btn">Сделать ставку (10💰)</button>
         <div id="timer-display" style="display:none">Осталось: <span id="time-left">30</span>с</div>
       </div>
+    </div>
+  </div>
+
+  <!-- Добавленное меню -->
+  <div id="main-menu">
+    <div class="menu-buttons">
+      <button class="menu-btn" onclick="window.location.href='index.html'">
+        <span class="btn-icon">🏠</span>
+        <span class="btn-text">Главная</span>
+      </button>
+      <button class="menu-btn" onclick="window.location.href='index.html#shop'">
+        <span class="btn-icon">🛒</span>
+        <span class="btn-text">Магазин</span>
+      </button>
     </div>
   </div>
 
