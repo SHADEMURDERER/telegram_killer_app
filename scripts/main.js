@@ -1,10 +1,8 @@
-// Общие переменные
 let currentPlayer = {
   id: null,
   name: 'Игрок'
 };
 
-// Инициализация Telegram WebApp
 function initTelegram() {
   if (window.Telegram && Telegram.WebApp) {
     const user = Telegram.WebApp.initDataUnsafe.user;
@@ -15,7 +13,6 @@ function initTelegram() {
         document.getElementById('username').textContent = currentPlayer.name;
       }
       
-      // Инициализируем кнопку Telegram
       Telegram.WebApp.expand();
       Telegram.WebApp.MainButton.setText("Продолжить").show();
     }
@@ -24,11 +21,9 @@ function initTelegram() {
     currentPlayer.name = 'Игрок';
   }
   
-  // Сохраняем игрока в глобальной области видимости
   window.currentPlayer = currentPlayer;
 }
 
-// Переключение вкладок
 function switchTab(tabName) {
   document.querySelectorAll('.tab-content').forEach(tab => {
     tab.classList.remove('active');
@@ -41,5 +36,4 @@ function switchTab(tabName) {
   event.target.classList.add('active');
 }
 
-// Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', initTelegram);
