@@ -1,28 +1,40 @@
+:root {
+  --tg-viewport-height: var(--tg-viewport-stable-height, 100vh);
+  --tg-viewport-width: 100vw;
+  --base-font-size: calc(var(--tg-viewport-height) * 0.02);
+}
+
+html {
+  font-size: var(--base-font-size);
+  height: var(--tg-viewport-height);
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   background: #2a2826;
   color: white;
   font-family: 'Arial', sans-serif;
-  height: 100vh;
-  overflow: hidden;
+  height: var(--tg-viewport-height);
+  max-height: var(--tg-viewport-height);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
   perspective: 1000px;
 }
 
 #panel {
   position: fixed;
-  bottom: -300px;
+  bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 90%;
+  width: 95%;
   max-width: 500px;
   background: rgba(42, 40, 38, 0.97);
   backdrop-filter: blur(12px);
-  border-radius: 25px;
-  padding: 25px;
+  border-radius: 1.5rem 1.5rem 0 0;
+  padding: 1.5rem;
   box-shadow: 0 -8px 30px rgba(0,0,0,0.4);
   z-index: 1002;
-  animation: slideUp 1.5s 6s ease-out forwards;
-  will-change: transform;
   border: 1px solid #3a3836;
 }
 
@@ -30,21 +42,23 @@ body {
   display: none;
   text-align: center;
 }
-.tab-content.active { display: block; }
+.tab-content.active { 
+  display: block;
+}
 
 .tab-buttons {
   display: flex;
   justify-content: center;
-  gap: 25px;
-  margin-bottom: 25px;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
 }
 
 .tab-button {
   background: none;
   border: none;
   color: white;
-  padding: 12px 25px;
-  font-size: 1.3rem;
+  padding: 0.8rem 1.2rem;
+  font-size: 1.2rem;
   cursor: pointer;
   position: relative;
   transition: all 0.3s ease;
@@ -56,8 +70,8 @@ body {
 }
 
 .shop-item {
-  margin: 15px 0;
-  padding: 15px;
+  margin: 1rem 0;
+  padding: 1rem;
   background: rgba(58, 56, 54, 0.5);
   border-radius: 12px;
   border-left: 3px solid #7f5af0;
@@ -65,5 +79,5 @@ body {
 
 @keyframes slideUp {
   0% { bottom: -300px; opacity: 0; }
-  100% { bottom: 30px; opacity: 1; }
+  100% { bottom: 0; opacity: 1; }
 }

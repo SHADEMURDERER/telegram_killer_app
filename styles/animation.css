@@ -14,8 +14,8 @@
 }
 
 #ring {
-  width: 600px;
-  height: 600px;
+  width: 60vmin;
+  height: 60vmin;
   background: url('../images/anim.gif') center/contain no-repeat;
   animation: 
     rotate 4s linear infinite,
@@ -28,7 +28,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 4.5rem;
+  font-size: 5vmin;
   font-weight: bold;
   color: white;
   text-shadow: 0 0 15px rgba(255,255,255,0.7);

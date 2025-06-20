@@ -5,27 +5,29 @@
   right: 0;
   background: rgba(42, 40, 38, 0.97);
   backdrop-filter: blur(12px);
-  padding: 15px 0;
+  padding: 1rem 0;
   z-index: 1000;
   border-top: 1px solid #3a3836;
   display: flex;
   justify-content: center;
   box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.3);
 }
+
 .tab-buttons {
   display: flex;
-  gap: 15px;
+  gap: 1rem;
   max-width: 500px;
   width: 100%;
-  padding: 0 20px;
+  padding: 0 1.5rem;
   justify-content: space-between;
 }
+
 .tab-button {
   background: none;
   border: none;
   color: white;
-  padding: 12px 15px;
-  font-size: 1rem;
+  padding: 0.8rem 1rem;
+  font-size: 1.1rem;
   cursor: pointer;
   border-radius: 8px;
   flex: 1;
@@ -33,10 +35,12 @@
   transition: all 0.3s ease;
   font-weight: 500;
 }
+
 .tab-button:hover {
   background: rgba(127, 90, 240, 0.2);
   transform: translateY(-2px);
 }
+
 .tab-button.active {
   color: #7f5af0;
   background: rgba(127, 90, 240, 0.1);

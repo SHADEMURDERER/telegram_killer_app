@@ -1,37 +1,38 @@
-/* Основные стили */
 body {
   margin: 0;
   padding: 0;
   background: #2a2826;
   color: white;
   font-family: Arial, sans-serif;
-  min-height: 100vh;
+  min-height: var(--tg-viewport-height);
   position: relative;
-  padding-bottom: 80px;
+  padding-bottom: 8rem;
 }
 
 #pvp-container {
   max-width: 800px;
   margin: 0 auto;
-  padding: 20px;
-  min-height: calc(100vh - 160px);
+  padding: 1rem;
+  min-height: calc(var(--tg-viewport-height) - 8rem);
+  max-height: calc(var(--tg-viewport-height) - 8rem);
+  overflow-y: auto;
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
+  margin-bottom: 2rem;
 }
 
 .create-btn {
   background: #7f5af0;
   color: white;
   border: none;
-  padding: 10px 20px;
+  padding: 0.8rem 1.5rem;
   border-radius: 5px;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: 1.1rem;
   transition: background 0.3s;
 }
 
@@ -42,14 +43,14 @@ body {
 #rooms-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 15px;
-  margin-bottom: 30px;
+  gap: 1rem;
+  margin-bottom: 2rem;
 }
 
 .room-card {
   background: rgba(58, 56, 54, 0.7);
   border-radius: 10px;
-  padding: 15px;
+  padding: 1rem;
   cursor: pointer;
   transition: all 0.3s;
   border-left: 3px solid #7f5af0;
@@ -63,12 +64,13 @@ body {
 .room-card h3 {
   margin-top: 0;
   color: #7f5af0;
+  font-size: 1.4rem;
 }
 
 .room-meta {
   display: flex;
   justify-content: space-between;
-  margin-top: 10px;
+  margin-top: 0.8rem;
   font-size: 0.9rem;
   color: #aaa;
 }
@@ -76,29 +78,30 @@ body {
 .empty-message {
   text-align: center;
   grid-column: 1 / -1;
-  padding: 40px 0;
+  padding: 3rem 0;
   color: #777;
 }
 
 #room-details {
   background: rgba(42, 40, 38, 0.9);
   border-radius: 15px;
-  padding: 20px;
-  margin-top: 20px;
+  padding: 1.5rem;
+  margin-top: 1.5rem;
 }
 
 #players-list {
-  margin: 20px 0;
+  margin: 1.5rem 0;
 }
 
 .player-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px;
+  padding: 0.8rem;
   background: rgba(58, 56, 54, 0.5);
   border-radius: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 0.8rem;
+  font-size: 1.2rem;
 }
 
 .player-status {
@@ -109,11 +112,11 @@ body {
   background: #4CAF50;
   color: white;
   border: none;
-  padding: 12px 25px;
+  padding: 0.8rem 1.5rem;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 1rem;
-  margin-right: 10px;
+  font-size: 1.1rem;
+  margin-right: 0.8rem;
   transition: background 0.3s;
 }
 
@@ -125,10 +128,10 @@ body {
   background: #F44336;
   color: white;
   border: none;
-  padding: 12px 25px;
+  padding: 0.8rem 1.5rem;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: 1.1rem;
   transition: background 0.3s;
 }
 
@@ -137,14 +140,13 @@ body {
 }
 
 #game-status {
-  margin-top: 20px;
-  padding: 15px;
+  margin-top: 1.5rem;
+  padding: 1rem;
   background: rgba(127, 90, 240, 0.2);
   border-radius: 8px;
   text-align: center;
 }
 
-/* Модальное окно */
 .modal {
   position: fixed;
   top: 0;
@@ -160,9 +162,9 @@ body {
 
 .modal-content {
   background: #2a2826;
-  padding: 25px;
+  padding: 1.5rem;
   border-radius: 15px;
-  width: 90%;
+  width: 85vw;
   max-width: 400px;
   border: 1px solid #3a3836;
 }
@@ -173,33 +175,34 @@ body {
 }
 
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 1.5rem;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 0.5rem;
 }
 
 .form-group input,
 .form-group select {
   width: 100%;
-  padding: 10px;
+  padding: 0.8rem;
   background: #3a3836;
   border: 1px solid #4a4846;
   border-radius: 5px;
   color: white;
+  font-size: 1.1rem;
 }
 
 .modal-buttons {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
+  gap: 0.8rem;
+  margin-top: 1.5rem;
 }
 
 .modal-buttons button {
-  padding: 10px 20px;
+  padding: 0.8rem 1.5rem;
   border-radius: 5px;
   border: none;
   cursor: pointer;
@@ -215,7 +218,6 @@ body {
   color: white;
 }
 
-/* Анимации */
 @keyframes pulse {
   0% { opacity: 0.6; }
   50% { opacity: 1; }
@@ -231,55 +233,9 @@ body {
   color: #F44336;
 }
 
-/* Нижняя панель */
-#panel {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(42, 40, 38, 0.97);
-  backdrop-filter: blur(12px);
-  padding: 15px 0;
-  z-index: 1000;
-  border-top: 1px solid #3a3836;
-  display: flex;
-  justify-content: center;
-}
-
-.tab-buttons {
-  display: flex;
-  gap: 15px;
-  max-width: 500px;
-  width: 100%;
-  padding: 0 20px;
-  justify-content: space-between;
-}
-
-.tab-button {
-  background: none;
-  border: none;
-  color: white;
-  padding: 10px 15px;
-  font-size: 1rem;
-  cursor: pointer;
-  border-radius: 8px;
-  flex: 1;
-  text-align: center;
-  transition: all 0.3s;
-}
-
-.tab-button:hover {
-  background: rgba(127, 90, 240, 0.2);
-}
-
-.tab-button.active {
-  color: #7f5af0;
-  background: rgba(127, 90, 240, 0.1);
-}
-
 #version {
   text-align: center;
-  margin-top: 20px;
+  margin-top: 1.5rem;
   color: #777;
   font-size: 0.9rem;
 }
