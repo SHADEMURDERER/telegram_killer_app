@@ -6,38 +6,101 @@
   <title>Gizmo PVP</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-  <link rel="stylesheet" href="styles/main.css">
-  <link rel="stylesheet" href="styles/pvp-game.css">
+  <style>
+    body {
+      margin: 0;
+      background: #2a2826;
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+    #roulette-container {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+      position: relative;
+    }
+    #roulette-track {
+      height: 60px;
+      background: #3a3836;
+      border-radius: 10px;
+      margin: 40px 0 30px;
+      overflow: hidden;
+      position: relative;
+    }
+    #roulette-slots-wrapper {
+      height: 100%;
+      width: 100%;
+      position: relative;
+      display: flex;
+    }
+    #roulette-slots {
+      height: 100%;
+      display: flex;
+      position: relative;
+      min-width: 100%;
+    }
+    .roulette-slot {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: absolute;
+      top: 0;
+    }
+    .slot-percent {
+      font-weight: bold;
+      font-size: 1rem;
+      text-shadow: 0 0 3px rgba(0,0,0,0.5);
+      z-index: 2;
+    }
+    #roulette-arrow {
+      position: absolute;
+      top: 50px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 15px solid transparent;
+      border-right: 15px solid transparent;
+      border-top: 25px solid #7f5af0;
+      z-index: 10;
+      filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));
+    }
+    #place-bet-btn {
+      background: #7f5af0;
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background 0.3s;
+    }
+    #place-bet-btn:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+    #place-bet-btn:hover:not(:disabled) {
+      background: #6a4ac9;
+    }
+    #timer-display {
+      font-size: 1.1rem;
+      color: #FFC107;
+      margin-top: 10px;
+    }
+  </style>
 </head>
 <body>
-<div id="pvp-container">
-  <div class="header">
-    <h2>🎮 PVP Рулетка</h2>
-  </div>
-  
-  <div id="roulette-container">
-    <div id="roulette-arrow"></div>
-    <div id="roulette-track">
-      <div id="roulette-slots-wrapper">
-        <div id="roulette-slots"></div>
-      </div>
-    </div>
-    <div id="winner-display"></div>
-    <div id="bet-controls">
-      <button id="place-bet-btn" class="bet-btn">Сделать ставку</button>
-      <div id="timer-display" style="display:none;">Осталось: <span id="time-left">30</span>с</div>
+<div id="roulette-container">
+  <div id="roulette-arrow"></div>
+  <div id="roulette-track">
+    <div id="roulette-slots-wrapper">
+      <div id="roulette-slots"></div>
     </div>
   </div>
-  
-  <div id="version">Build 5.3v</div>
-</div>
-
-<div id="panel">
-  <div class="tab-buttons">
-    <button class="tab-button" onclick="window.location.href='index.html'">Профиль</button>
-    <button class="tab-button" onclick="window.location.href='index.html#shop'">Магазин</button>
-    <button class="tab-button active" onclick="window.location.href='pvp-game.html'">PVP</button>
-  </div>
+  <div id="winner-display"></div>
+  <button id="place-bet-btn">Сделать ставку</button>
+  <div id="timer-display" style="display:none;">Осталось: <span id="time-left">30</span>с</div>
 </div>
 
 <script>
@@ -52,6 +115,9 @@ document.addEventListener('DOMContentLoaded', function() {
   const app = firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
+  // Очистка старых данных (выполнить один раз)
+  // db.ref('pvpRoulette').remove().then(() => console.log('Database cleaned'));
+
   // Текущий игрок
   const currentPlayer = {
     id: window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 'player_'+Math.random().toString(36).slice(2,9),
@@ -64,7 +130,8 @@ document.addEventListener('DOMContentLoaded', function() {
     slotWidth: 0,
     serverTimeOffset: 0,
     isPlacingBet: false,
-    timerInterval: null
+    timerInterval: null,
+    currentAnimation: null
   };
 
   // Элементы интерфейса
@@ -74,7 +141,8 @@ document.addEventListener('DOMContentLoaded', function() {
     winnerDisplay: document.getElementById('winner-display'),
     placeBetBtn: document.getElementById('place-bet-btn'),
     timerDisplay: document.getElementById('timer-display'),
-    timeLeftSpan: document.getElementById('time-left')
+    timeLeftSpan: document.getElementById('time-left'),
+    rouletteArrow: document.getElementById('roulette-arrow')
   };
 
   // Ссылки Firebase
@@ -115,7 +183,7 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
 
-    // Обновление если есть невалидные игроки
+    // Если есть невалидные игроки - обновляем
     if (Object.keys(validPlayers).length !== Object.keys(room.players||{}).length) {
       return roomRef.child('players').set(validPlayers);
     }
@@ -123,52 +191,85 @@ document.addEventListener('DOMContentLoaded', function() {
     updateUI(room);
   }
 
-  // Обработчик ставки
+  // Обработчик ставки с транзакцией
   async function placeBetHandler() {
     if (gameState.isPlacingBet) return;
     gameState.isPlacingBet = true;
+    elements.placeBetBtn.disabled = true;
+    elements.placeBetBtn.textContent = 'Вы уже сделали ставку';
 
     try {
-      const room = (await roomRef.once('value')).val();
-      if (!room) return;
+      // Используем транзакцию для атомарного обновления
+      await roomRef.transaction((room) => {
+        if (!room) {
+          room = {
+            status: 'waiting',
+            players: {},
+            startTime: null,
+            winner: null
+          };
+        }
 
-      if (room.status !== 'waiting' && room.status !== 'betting') {
-        alert('Ставки закрыты');
-        return;
-      }
+        // Проверка статуса комнаты
+        if (room.status !== 'waiting' && room.status !== 'betting') {
+          throw new Error('Ставки закрыты');
+        }
 
-      if (room.players?.[currentPlayer.id]) {
-        alert('Вы уже сделали ставку');
-        return;
-      }
+        // Проверка существующей ставки
+        if (room.players?.[currentPlayer.id]) {
+          throw new Error('Вы уже сделали ставку');
+        }
 
-      const usedColors = Object.values(room.players||{}).map(p=>p.color).filter(Boolean);
-      const availableColor = gameState.colors.find(c=>!usedColors.includes(c))||gameState.colors[0];
+        // Выбор цвета
+        const usedColors = Object.values(room.players||{}).map(p=>p.color).filter(Boolean);
+        const availableColor = gameState.colors.find(c=>!usedColors.includes(c))||gameState.colors[0];
 
-      await roomRef.child('players').child(currentPlayer.id).set({
-        name: currentPlayer.name,
-        color: availableColor,
-        betTime: getServerTime()
+        // Добавление игрока
+        room.players = room.players || {};
+        room.players[currentPlayer.id] = {
+          name: currentPlayer.name,
+          color: availableColor,
+          betTime: getServerTime()
+        };
+
+        // Запуск таймера если нужно
+        if (Object.keys(room.players).length >= 2 && room.status === 'waiting') {
+          room.status = 'betting';
+          room.startTime = getServerTime();
+        }
+
+        return room;
       });
 
-      const playerCount = Object.keys(room.players||{}).length + 1;
-      if (playerCount >= 2 && room.status === 'waiting') {
-        await roomRef.update({
-          status: 'betting',
-          startTime: getServerTime()
-        });
-      }
     } catch (error) {
-      console.error('Ошибка ставки:',error);
-      alert('Ошибка при ставке');
+      console.error('Ошибка ставки:', error);
+      alert(error.message);
+      updateButtonState();
     } finally {
       gameState.isPlacingBet = false;
     }
   }
 
+  function updateButtonState() {
+    roomRef.once('value').then(snap => {
+      const room = snap.val();
+      if (room?.players?.[currentPlayer.id]) {
+        elements.placeBetBtn.disabled = true;
+        elements.placeBetBtn.textContent = 'Вы уже сделали ставку';
+      } else {
+        elements.placeBetBtn.disabled = false;
+        elements.placeBetBtn.textContent = 'Сделать ставку';
+      }
+    });
+  }
+
   // Сброс комнаты
   function resetRoom() {
     clearTimer();
+    if (gameState.currentAnimation) {
+      cancelAnimationFrame(gameState.currentAnimation);
+      gameState.currentAnimation = null;
+    }
     const roomData = {
       status: 'waiting',
       players: {},
@@ -185,18 +286,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     switch(room.status) {
       case 'waiting':
-        elements.placeBetBtn.disabled = false;
-        elements.placeBetBtn.textContent = 'Сделать ставку';
+        updateButtonState();
         elements.timerDisplay.style.display = 'none';
         elements.winnerDisplay.textContent = '';
         break;
         
       case 'betting':
-        elements.placeBetBtn.disabled = !!room.players?.[currentPlayer.id];
-        elements.placeBetBtn.textContent = room.players?.[currentPlayer.id] 
-          ? 'Вы уже сделали ставку' 
-          : 'Сделать ставку';
-        
+        updateButtonState();
         if (room.startTime) startTimer(room.startTime);
         break;
         
@@ -261,18 +357,20 @@ document.addEventListener('DOMContentLoaded', function() {
     
     gameState.slotWidth = 100/totalPlayers;
     
-    activePlayers.forEach((player,index)=>{
-      createSlot(player,index,totalPlayers);
+    // Создаем дубликаты для бесконечной анимации
+    activePlayers.forEach((player,index) => {
+      createSlot(player, index, totalPlayers);
+      createSlot(player, index + totalPlayers, totalPlayers); // Дубликат справа
     });
   }
 
   // Создание слота
-  function createSlot(player,index,totalPlayers) {
+  function createSlot(player, index, totalPlayers) {
     const slot = document.createElement('div');
     slot.className = 'roulette-slot';
     slot.style.backgroundColor = player.color;
     slot.style.width = `${gameState.slotWidth}%`;
-    slot.style.left = `${index*gameState.slotWidth}%`;
+    slot.style.left = `${index * gameState.slotWidth}%`;
     
     const percent = document.createElement('div');
     percent.className = 'slot-percent';
@@ -289,37 +387,62 @@ document.addEventListener('DOMContentLoaded', function() {
     if (activePlayers.length < 2) return resetRoom();
 
     roomRef.update({status:'spinning'}).then(()=>{
-      const spinDuration = 3000 + Math.random()*4000;
+      const spinDuration = 5000; // 5 секунд анимации
       const winnerIndex = Math.floor(Math.random()*activePlayers.length);
       const winnerId = activePlayers[winnerIndex][0];
       const winner = activePlayers[winnerIndex][1];
       
       gameState.slotWidth = 100/activePlayers.length;
-      animateRoulette(winnerIndex,spinDuration,()=>{
+      animateRoulette(winnerIndex, spinDuration, ()=>{
         roomRef.update({
           status: 'finished',
           winner: {id:winnerId,name:winner.name,color:winner.color},
           finishTime: getServerTime()
         }).then(()=>{
-          setTimeout(resetRoom,10000);
+          setTimeout(resetRoom, 10000);
         });
       });
     });
   }
 
-  // Анимация рулетки
-  function animateRoulette(winnerIndex,duration,callback) {
-    const targetPosition = 100-(winnerIndex*gameState.slotWidth);
+  // Анимация рулетки с бесконечным циклом
+  function animateRoulette(winnerIndex, duration, callback) {
+    const startTime = Date.now();
+    const totalSlots = Object.keys(gameState.currentRoom?.players||{}).length;
+    const targetPosition = 100 - (winnerIndex * gameState.slotWidth);
+    const totalWidth = totalSlots * gameState.slotWidth * 2; // Учитываем дубликаты
     
+    // Сброс позиции
     elements.rouletteSlotsWrapper.style.transition = 'none';
     elements.rouletteSlotsWrapper.style.transform = 'translateX(0)';
     
-    setTimeout(()=>{
-      elements.rouletteSlotsWrapper.style.transition = `transform ${duration/1000}s cubic-bezier(0.2,0.1,0.2,1)`;
-      elements.rouletteSlotsWrapper.style.transform = `translateX(-${targetPosition}%)`;
+    function animate() {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
       
-      setTimeout(callback,duration);
-    },10);
+      // Плавное замедление в конце
+      const easingProgress = progress < 0.9 ? 
+        progress * 1.1 : 
+        0.99 + (progress - 0.9) * 0.1;
+      
+      const currentPosition = easingProgress * targetPosition;
+      
+      // Бесконечная анимация
+      const wrappedPosition = currentPosition % totalWidth;
+      elements.rouletteSlotsWrapper.style.transform = `translateX(-${wrappedPosition}%)`;
+      
+      if (progress < 1) {
+        gameState.currentAnimation = requestAnimationFrame(animate);
+      } else {
+        gameState.currentAnimation = null;
+        callback();
+      }
+    }
+    
+    // Небольшая задержка перед началом анимации
+    setTimeout(() => {
+      gameState.currentAnimation = requestAnimationFrame(animate);
+    }, 50);
   }
 
   // Показать победителя
