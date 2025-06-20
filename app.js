@@ -1,16 +1,16 @@
-function adjustViewport() {
-  const vh = window.innerHeight * 0.01;
-  document.documentElement.style.setProperty('--tg-viewport-height', `${vh}px`);
-  document.body.style.height = `${window.innerHeight}px`;
+// Проверка alert
+alert("Сообщение на русском!");  // Кириллица должна быть видна прямо в коде
+
+// Инициализация Telegram WebApp
+if (window.Telegram?.WebApp) {
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    tg.MainButton.setText("Продолжить").show();
 }
 
-if (window.Telegram?.WebApp) {
-  Telegram.WebApp.expand();
-  Telegram.WebApp.MainButton.setText("Продолжить").show();
-  Telegram.WebApp.onEvent('viewportChanged', adjustViewport);
+function adjustViewport() {
+  document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
 }
 
 window.addEventListener('resize', adjustViewport);
 adjustViewport();
-
-alert("Сообщение на русском!");
