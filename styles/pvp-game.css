@@ -33,15 +33,23 @@ body {
   height: 60px;
   background: #3a3836;
   border-radius: 10px;
-  margin: 30px 0 40px;
+  margin: 40px 0 30px;
   overflow: hidden;
   position: relative;
+}
+
+#roulette-slots-wrapper {
+  height: 100%;
+  width: 100%;
+  position: relative;
+  display: flex;
 }
 
 #roulette-slots {
   height: 100%;
   display: flex;
-  transition: transform 3s cubic-bezier(0.1, 0.7, 0.1, 1);
+  position: relative;
+  min-width: 100%;
 }
 
 .roulette-slot {
@@ -49,7 +57,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
+  position: absolute;
+  top: 0;
 }
 
 .slot-percent {
@@ -61,7 +70,7 @@ body {
 
 #roulette-arrow {
   position: absolute;
-  top: -15px;
+  top: -20px;
   left: 50%;
   transform: translateX(-50%);
   width: 0;

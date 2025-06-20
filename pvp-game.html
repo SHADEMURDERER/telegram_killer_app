@@ -18,7 +18,9 @@
   <div id="roulette-container">
     <div id="roulette-arrow"></div>
     <div id="roulette-track">
-      <div id="roulette-slots"></div>
+      <div id="roulette-slots-wrapper">
+        <div id="roulette-slots"></div>
+      </div>
     </div>
     <div id="winner-display"></div>
     <div id="bet-controls">
@@ -27,7 +29,7 @@
     </div>
   </div>
   
-  <div id="version">Build 2.4v (FinalRoulette)</div>
+  <div id="version">Build 2.5v (FixedRoulette)</div>
 </div>
 
 <div id="panel">
@@ -62,11 +64,13 @@ const gameState = {
   timer: 30,
   winner: null,
   colors: ['#FF5252', '#4CAF50', '#2196F3', '#FFC107', '#9C27B0', '#00BCD4'],
-  usedColors: []
+  usedColors: [],
+  slotWidth: 0
 };
 
 // Элементы интерфейса
 const rouletteSlots = document.getElementById('roulette-slots');
+const rouletteSlotsWrapper = document.getElementById('roulette-slots-wrapper');
 const winnerDisplay = document.getElementById('winner-display');
 const placeBetBtn = document.getElementById('place-bet-btn');
 const timerDisplay = document.getElementById('timer-display');
@@ -80,16 +84,7 @@ function initRouletteGame() {
   placeBetBtn.addEventListener('click', placeBet);
   
   // Инициализация игры
-  gameRef.transaction(currentData => {
-    if (currentData === null) {
-      return {
-        status: 'waiting',
-        startTime: null,
-        winner: null
-      };
-    }
-    return currentData;
-  });
+  resetGameState();
   
   // Слушаем изменения в игре
   gameRef.on('value', (snapshot) => {
@@ -103,6 +98,18 @@ function initRouletteGame() {
   playersRef.on('value', (snapshot) => {
     const players = snapshot.val() || {};
     updatePlayers(players);
+  });
+}
+
+// Сброс состояния игры
+function resetGameState() {
+  gameRef.transaction(currentData => {
+    return {
+      status: 'waiting',
+      startTime: null,
+      winner: null,
+      finishTime: null
+    };
   });
 }
 
@@ -136,9 +143,6 @@ function placeBet() {
   };
   
   playersRef.child(currentPlayer.id).set(playerData)
-    .then(() => {
-      console.log('Ставка успешно размещена');
-    })
     .catch(error => {
       console.error('Ошибка при размещении ставки:', error);
       alert('Ошибка при размещении ставки. Попробуйте еще раз.');
@@ -163,7 +167,7 @@ function updateGameState(game) {
     placeBetBtn.disabled = true;
     timerDisplay.style.display = 'none';
   } else if (game.status === 'finished') {
-    showWinner();
+    showWinner(game.winner);
     setTimeout(() => {
       resetGame();
     }, 10000);
@@ -195,22 +199,36 @@ function updateRouletteDisplay() {
     return;
   }
   
-  // Создаем слоты для каждого игрока
+  // Рассчитываем ширину слота
+  gameState.slotWidth = 100 / totalPlayers;
+  
+  // Создаем дублированные слоты для бесконечной анимации
   players.forEach((player, index) => {
-    const slot = document.createElement('div');
-    slot.className = 'roulette-slot';
-    slot.style.backgroundColor = player.color;
-    slot.style.width = `${100 / totalPlayers}%`;
-    
-    // Добавляем процент в слот
-    const percent = document.createElement('div');
-    percent.className = 'slot-percent';
-    percent.textContent = `${Math.round(100 / totalPlayers)}%`;
-    percent.style.color = getContrastColor(player.color);
-    
-    slot.appendChild(percent);
-    rouletteSlots.appendChild(slot);
+    createSlot(player, index);
+    // Дублируем слоты для бесшовной анимации
+    if (index === 0) createSlot(player, index, true);
   });
+}
+
+// Создание слота рулетки
+function createSlot(player, index, isClone = false) {
+  const slot = document.createElement('div');
+  slot.className = 'roulette-slot';
+  slot.style.backgroundColor = player.color;
+  slot.style.width = `${gameState.slotWidth}%`;
+  slot.style.left = `${index * gameState.slotWidth}%`;
+  if (isClone) {
+    slot.style.left = `${(index - 1) * gameState.slotWidth}%`;
+  }
+  
+  // Добавляем процент в слот
+  const percent = document.createElement('div');
+  percent.className = 'slot-percent';
+  percent.textContent = `${Math.round(100 / Object.keys(gameState.players).length)}%`;
+  percent.style.color = getContrastColor(player.color);
+  
+  slot.appendChild(percent);
+  rouletteSlots.appendChild(slot);
 }
 
 // Определение контрастного цвета для текста
@@ -247,31 +265,35 @@ function startRoulette() {
   const spinDuration = 3000 + Math.random() * 4000; // 3-7 секунд
   const players = Object.values(gameState.players);
   const winnerIndex = Math.floor(Math.random() * players.length);
-  const winner = players[winnerIndex];
   
-  // Анимация
-  rouletteSlots.style.transition = 'none';
-  rouletteSlots.style.transform = 'translateX(0)';
+  // Рассчитываем смещение для остановки на победителе
+  const targetPosition = 100 - (winnerIndex * gameState.slotWidth);
   
+  // Сбрасываем анимацию
+  rouletteSlotsWrapper.style.transition = 'none';
+  rouletteSlotsWrapper.style.transform = 'translateX(0)';
+  
+  // Даем время для применения сброса
   setTimeout(() => {
-    rouletteSlots.style.transition = `transform ${spinDuration/1000}s cubic-bezier(0.1, 0.7, 0.1, 1)`;
-    const shift = 100 - (winnerIndex * (100 / players.length));
-    rouletteSlots.style.transform = `translateX(-${shift}%)`;
+    // Запускаем анимацию
+    rouletteSlotsWrapper.style.transition = `transform ${spinDuration/1000}s cubic-bezier(0.2, 0.1, 0.2, 1)`;
+    rouletteSlotsWrapper.style.transform = `translateX(-${targetPosition}%)`;
     
     setTimeout(() => {
+      // Фиксируем победителя
       gameRef.update({
         status: 'finished',
         winner: Object.keys(gameState.players)[winnerIndex],
         finishTime: Date.now()
       });
     }, spinDuration);
-  }, 50);
+  }, 10);
 }
 
 // Показать победителя
-function showWinner() {
-  if (gameState.winner && gameState.players[gameState.winner]) {
-    const winner = gameState.players[gameState.winner];
+function showWinner(winnerId) {
+  if (winnerId && gameState.players[winnerId]) {
+    const winner = gameState.players[winnerId];
     winnerDisplay.innerHTML = `
       <div class="winner-box" style="background-color: ${winner.color}">
         Победитель: ${winner.name}!
@@ -280,18 +302,17 @@ function showWinner() {
   }
 }
 
-// Сброс игры
+// Полный сброс игры
 function resetGame() {
   playersRef.remove().then(() => {
-    gameRef.update({
-      status: 'waiting',
-      winner: null,
-      startTime: null
-    });
-    
+    resetGameState();
     placeBetBtn.disabled = false;
     gameState.usedColors = [];
     winnerDisplay.textContent = '';
+    
+    // Сбрасываем позицию рулетки
+    rouletteSlotsWrapper.style.transition = 'none';
+    rouletteSlotsWrapper.style.transform = 'translateX(0)';
   });
 }
 
