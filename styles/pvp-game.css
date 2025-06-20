@@ -26,13 +26,14 @@ body {
   border-radius: 15px;
   padding: 20px;
   margin-top: 20px;
+  position: relative;
 }
 
 #roulette-track {
-  height: 50px;
+  height: 60px;
   background: #3a3836;
-  border-radius: 25px;
-  margin: 20px 0;
+  border-radius: 10px;
+  margin: 30px 0 40px;
   overflow: hidden;
   position: relative;
 }
@@ -48,28 +49,44 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  position: relative;
+}
+
+.slot-percent {
   font-weight: bold;
-  font-size: 1.2rem;
+  font-size: 1rem;
+  text-shadow: 0 0 3px rgba(0,0,0,0.5);
+  z-index: 2;
 }
 
 #roulette-arrow {
   position: absolute;
-  top: 50%;
+  top: -15px;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   width: 0;
   height: 0;
-  border-left: 10px solid transparent;
-  border-right: 10px solid transparent;
-  border-top: 20px solid white;
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-top: 25px solid #7f5af0;
   z-index: 10;
+  filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));
 }
 
-#roulette-info {
+#winner-display {
   text-align: center;
-  margin: 15px 0;
-  font-size: 1.2rem;
+  margin: 20px 0;
+  min-height: 40px;
+}
+
+.winner-box {
+  display: inline-block;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 0 3px rgba(0,0,0,0.5);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.2);
 }
 
 #bet-controls {
