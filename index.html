@@ -38,8 +38,8 @@
   </div>
 </div>
 
-<script src="scripts/main.js"></script>
-<script src="scripts/animation.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
@@ -47,7 +47,7 @@
   };
   
   const app = firebase.initializeApp(firebaseConfig);
-  window.db = firebase.getDatabase(app);
+  window.db = firebase.database(app);
 </script>
 </body>
 </html>

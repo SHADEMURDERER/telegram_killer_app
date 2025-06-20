@@ -115,9 +115,6 @@ document.addEventListener('DOMContentLoaded', function() {
   const app = firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  // Очистка старых данных (выполнить один раз)
-  // db.ref('pvpRoulette').remove().then(() => console.log('Database cleaned'));
-
   // Текущий игрок
   const currentPlayer = {
     id: window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 'player_'+Math.random().toString(36).slice(2,9),
@@ -131,7 +128,8 @@ document.addEventListener('DOMContentLoaded', function() {
     serverTimeOffset: 0,
     isPlacingBet: false,
     timerInterval: null,
-    currentAnimation: null
+    currentAnimation: null,
+    currentRoom: null
   };
 
   // Элементы интерфейса
@@ -172,6 +170,8 @@ document.addEventListener('DOMContentLoaded', function() {
   function roomListener(snapshot) {
     const room = snapshot.val();
     if (!room) return resetRoom();
+    
+    gameState.currentRoom = room;
 
     // Валидация игроков
     const validPlayers = {};
@@ -410,7 +410,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const startTime = Date.now();
     const totalSlots = Object.keys(gameState.currentRoom?.players||{}).length;
     const targetPosition = 100 - (winnerIndex * gameState.slotWidth);
-    const totalWidth = totalSlots * gameState.slotWidth * 2; // Учитываем дубликаты
+    const totalWidth = totalSlots * gameState.slotWidth * 2;
     
     // Сброс позиции
     elements.rouletteSlotsWrapper.style.transition = 'none';
@@ -420,15 +420,14 @@ document.addEventListener('DOMContentLoaded', function() {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / duration, 1);
       
-      // Плавное замедление в конце
-      const easingProgress = progress < 0.9 ? 
-        progress * 1.1 : 
-        0.99 + (progress - 0.9) * 0.1;
+      // Ускорение в начале и замедление в конце
+      const easingProgress = progress < 0.8 ? 
+        easeOutQuad(progress * 1.25) : 
+        0.8 + easeInOutQuad((progress - 0.8) / 0.2) * 0.2;
       
       const currentPosition = easingProgress * targetPosition;
-      
-      // Бесконечная анимация
       const wrappedPosition = currentPosition % totalWidth;
+      
       elements.rouletteSlotsWrapper.style.transform = `translateX(-${wrappedPosition}%)`;
       
       if (progress < 1) {
@@ -439,10 +438,16 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
     
-    // Небольшая задержка перед началом анимации
-    setTimeout(() => {
-      gameState.currentAnimation = requestAnimationFrame(animate);
-    }, 50);
+    // Функции для плавности анимации
+    function easeOutQuad(t) {
+      return t * (2 - t);
+    }
+    
+    function easeInOutQuad(t) {
+      return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    }
+    
+    gameState.currentAnimation = requestAnimationFrame(animate);
   }
 
   // Показать победителя
