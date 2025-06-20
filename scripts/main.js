@@ -17,12 +17,17 @@ async function initTelegram() {
   const app = firebase.initializeApp(firebaseConfig);
   window.db = firebase.database();
 
-  if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
-    const user = Telegram.WebApp.initDataUnsafe.user;
-    const userId = 'tg_' + user.id;
-    const userRef = firebase.database().ref(`users/${userId}`);
-
+  if (window.Telegram?.WebApp?.initData) {
     try {
+      const isValid = await validateTelegramData(Telegram.WebApp.initData);
+      if (!isValid) throw new Error('Invalid Telegram data');
+
+      const user = Telegram.WebApp.initDataUnsafe.user;
+      if (!user?.id) throw new Error('No user data');
+
+      const userId = 'tg_' + user.id;
+      const userRef = firebase.database().ref(`users/${userId}`);
+
       const snapshot = await userRef.once('value');
       
       if (snapshot.exists()) {
@@ -56,7 +61,7 @@ async function initTelegram() {
 
       Telegram.WebApp.expand();
     } catch (error) {
-      console.error('Ошибка загрузки пользователя:', error);
+      console.error('Ошибка авторизации:', error);
       currentPlayer.id = 'local_' + Math.random().toString(36).substring(2, 9);
     }
   } else {
@@ -65,6 +70,43 @@ async function initTelegram() {
 
   updateUserInterface();
   initPresenceTracking();
+}
+
+async function validateTelegramData(initData) {
+  try {
+    const encoder = new TextEncoder();
+    const secretKey = await window.crypto.subtle.importKey(
+      'raw',
+      encoder.encode('WebAppData'),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+
+    const urlParams = new URLSearchParams(initData);
+    const hash = urlParams.get('hash');
+    urlParams.delete('hash');
+
+    const dataToCheck = Array.from(urlParams.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => `${key}=${value}`)
+      .join('\n');
+
+    const secret = await window.crypto.subtle.sign(
+      'HMAC',
+      secretKey,
+      encoder.encode(dataToCheck)
+    );
+
+    const hexSecret = Array.from(new Uint8Array(secret))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    return hexSecret === hash;
+  } catch (error) {
+    console.error('Validation error:', error);
+    return false;
+  }
 }
 
 function updateUserInterface() {
