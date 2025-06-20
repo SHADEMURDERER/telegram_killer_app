@@ -29,7 +29,7 @@
     </div>
   </div>
   
-  <div id="version">Build 4.0v (Room System)</div>
+  <div id="version">Build 4.1v (Stable Room System)</div>
 </div>
 
 <div id="panel">
@@ -67,7 +67,8 @@ const currentPlayer = {
 const gameState = {
   colors: ['#FF5252', '#4CAF50', '#2196F3', '#FFC107', '#9C27B0', '#00BCD4'],
   slotWidth: 0,
-  serverTimeOffset: 0
+  serverTimeOffset: 0,
+  isPlacingBet: false
 };
 
 // Элементы интерфейса
@@ -89,22 +90,28 @@ function initRouletteGame() {
     gameState.serverTimeOffset = snap.val() || 0;
   });
 
-  // Сброс комнаты при загрузке (если она пустая)
-  roomRef.once('value').then((snapshot) => {
-    if (!snapshot.exists()) {
-      resetRoom();
+  // Обработчик клика на кнопку ставки
+  placeBetBtn.addEventListener('click', () => {
+    if (!gameState.isPlacingBet) {
+      gameState.isPlacingBet = true;
+      placeBet().finally(() => {
+        gameState.isPlacingBet = false;
+      });
     }
   });
 
-  // Обработчик клика на кнопку ставки
-  placeBetBtn.addEventListener('click', placeBet);
-
   // Слушаем изменения в комнате
   roomRef.on('value', (snapshot) => {
-    const room = snapshot.val();
-    if (room) {
-      updateGameUI(room);
+    try {
+      const room = snapshot.val();
+      if (room) {
+        updateGameUI(room);
+      }
+    } catch (error) {
+      console.error('Ошибка обработки комнаты:', error);
     }
+  }, (error) => {
+    console.error('Ошибка чтения комнаты:', error);
   });
 }
 
@@ -118,16 +125,20 @@ function resetRoom() {
     lastReset: getServerTime()
   };
 
-  roomRef.set(roomData).catch(error => {
+  return roomRef.set(roomData).catch(error => {
     console.error('Ошибка сброса комнаты:', error);
   });
 }
 
 // Размещение ставки
-function placeBet() {
-  roomRef.once('value').then((snapshot) => {
+async function placeBet() {
+  try {
+    const snapshot = await roomRef.once('value');
     const room = snapshot.val();
-    if (!room) return;
+    if (!room) {
+      await resetRoom();
+      return;
+    }
 
     // Проверяем статус комнаты
     if (room.status !== 'waiting' && room.status !== 'betting') {
@@ -136,13 +147,13 @@ function placeBet() {
     }
 
     // Проверяем, не сделал ли уже игрок ставку
-    if (room.players[currentPlayer.id]) {
+    if (room.players && room.players[currentPlayer.id]) {
       alert('Вы уже сделали ставку');
       return;
     }
 
     // Выбираем уникальный цвет
-    const usedColors = Object.values(room.players).map(p => p.color);
+    const usedColors = room.players ? Object.values(room.players).map(p => p.color) : [];
     let availableColors = gameState.colors.filter(c => !usedColors.includes(c));
     if (availableColors.length === 0) {
       availableColors = gameState.colors;
@@ -157,56 +168,56 @@ function placeBet() {
       betTime: getServerTime()
     };
 
-    roomRef.child('players').child(currentPlayer.id).set(playerData)
-      .then(() => {
-        // Если игроков стало 2+, запускаем таймер
-        if (Object.keys(room.players).length + 1 >= 2 && room.status === 'waiting') {
-          startBettingTimer();
-        }
-      })
-      .catch(error => {
-        console.error('Ошибка размещения ставки:', error);
-        alert('Ошибка при размещении ставки. Попробуйте снова.');
-      });
-  });
+    await roomRef.child('players').child(currentPlayer.id).set(playerData);
+
+    // Если игроков стало 2+, запускаем таймер
+    const playerCount = room.players ? Object.keys(room.players).length + 1 : 1;
+    if (playerCount >= 2 && room.status === 'waiting') {
+      await startBettingTimer();
+    }
+  } catch (error) {
+    console.error('Ошибка размещения ставки:', error);
+    alert('Ошибка при размещении ставки. Попробуйте снова.');
+    throw error;
+  }
 }
 
 // Запуск таймера ставок
 function startBettingTimer() {
-  roomRef.update({
+  return roomRef.update({
     status: 'betting',
     startTime: getServerTime()
   }).catch(error => {
     console.error('Ошибка запуска таймера:', error);
+    throw error;
   });
 }
 
 // Запуск рулетки
 function startRoulette(room) {
-  const activePlayers = Object.entries(room.players);
+  const activePlayers = room.players ? Object.entries(room.players) : [];
   if (activePlayers.length < 2) {
-    resetRoom();
-    return;
+    return resetRoom();
   }
 
-  roomRef.update({
+  return roomRef.update({
     status: 'spinning'
   }).then(() => {
     const spinDuration = 3000 + Math.random() * 4000;
     const winnerIndex = Math.floor(Math.random() * activePlayers.length);
     const winnerId = activePlayers[winnerIndex][0];
-    const winnerColor = activePlayers[winnerIndex][1].color;
+    const winnerPlayer = activePlayers[winnerIndex][1];
 
     // Анимация рулетки
     gameState.slotWidth = 100 / activePlayers.length;
-    animateRoulette(winnerIndex, spinDuration, () => {
+    return animateRoulette(winnerIndex, spinDuration).then(() => {
       // После завершения анимации объявляем победителя
-      roomRef.update({
+      return roomRef.update({
         status: 'finished',
         winner: {
           id: winnerId,
-          name: activePlayers[winnerIndex][1].name,
-          color: winnerColor
+          name: winnerPlayer.name,
+          color: winnerPlayer.color
         },
         finishTime: getServerTime()
       }).then(() => {
@@ -218,94 +229,113 @@ function startRoulette(room) {
 }
 
 // Анимация рулетки
-function animateRoulette(winnerIndex, duration, callback) {
-  const targetPosition = 100 - (winnerIndex * gameState.slotWidth);
-  
-  rouletteSlotsWrapper.style.transition = 'none';
-  rouletteSlotsWrapper.style.transform = 'translateX(0)';
-  
-  setTimeout(() => {
-    rouletteSlotsWrapper.style.transition = `transform ${duration/1000}s cubic-bezier(0.2, 0.1, 0.2, 1)`;
-    rouletteSlotsWrapper.style.transform = `translateX(-${targetPosition}%)`;
+function animateRoulette(winnerIndex, duration) {
+  return new Promise((resolve) => {
+    const targetPosition = 100 - (winnerIndex * gameState.slotWidth);
     
-    setTimeout(callback, duration);
-  }, 10);
+    rouletteSlotsWrapper.style.transition = 'none';
+    rouletteSlotsWrapper.style.transform = 'translateX(0)';
+    
+    setTimeout(() => {
+      rouletteSlotsWrapper.style.transition = `transform ${duration/1000}s cubic-bezier(0.2, 0.1, 0.2, 1)`;
+      rouletteSlotsWrapper.style.transform = `translateX(-${targetPosition}%)`;
+      
+      setTimeout(resolve, duration);
+    }, 10);
+  });
 }
 
 // Обновление интерфейса на основе состояния комнаты
 function updateGameUI(room) {
-  // Обновляем статус игры
-  switch (room.status) {
-    case 'waiting':
-      placeBetBtn.disabled = false;
-      placeBetBtn.textContent = 'Сделать ставку';
-      timerDisplay.style.display = 'none';
-      break;
-      
-    case 'betting':
-      placeBetBtn.disabled = !!room.players[currentPlayer.id];
-      placeBetBtn.textContent = room.players[currentPlayer.id] ? 'Вы уже сделали ставку' : 'Сделать ставку';
-      
-      // Обновляем таймер
-      const elapsed = Math.floor((getServerTime() - room.startTime) / 1000);
-      const timeLeft = Math.max(0, 30 - elapsed);
-      timeLeftSpan.textContent = timeLeft;
-      timerDisplay.style.display = 'block';
-      
-      if (timeLeft <= 0 && Object.keys(room.players).length >= 2) {
-        startRoulette(room);
-      }
-      break;
-      
-    case 'spinning':
-      placeBetBtn.disabled = true;
-      timerDisplay.style.display = 'none';
-      break;
-      
-    case 'finished':
-      showWinner(room.winner);
-      placeBetBtn.disabled = true;
-      timerDisplay.style.display = 'none';
-      break;
+  try {
+    // Обновляем статус игры
+    switch (room.status) {
+      case 'waiting':
+        placeBetBtn.disabled = false;
+        placeBetBtn.textContent = 'Сделать ставку';
+        timerDisplay.style.display = 'none';
+        winnerDisplay.textContent = '';
+        break;
+        
+      case 'betting':
+        placeBetBtn.disabled = !!(room.players && room.players[currentPlayer.id]);
+        placeBetBtn.textContent = (room.players && room.players[currentPlayer.id]) 
+          ? 'Вы уже сделали ставку' 
+          : 'Сделать ставку';
+        
+        // Обновляем таймер
+        if (room.startTime) {
+          const elapsed = Math.floor((getServerTime() - room.startTime) / 1000);
+          const timeLeft = Math.max(0, 30 - elapsed);
+          timeLeftSpan.textContent = timeLeft;
+          timerDisplay.style.display = 'block';
+          
+          if (timeLeft <= 0 && room.players && Object.keys(room.players).length >= 2) {
+            startRoulette(room);
+          }
+        }
+        break;
+        
+      case 'spinning':
+        placeBetBtn.disabled = true;
+        timerDisplay.style.display = 'none';
+        break;
+        
+      case 'finished':
+        showWinner(room.winner);
+        placeBetBtn.disabled = true;
+        timerDisplay.style.display = 'none';
+        break;
+    }
+    
+    // Обновляем отображение рулетки
+    updateRouletteDisplay(room.players || {});
+  } catch (error) {
+    console.error('Ошибка обновления интерфейса:', error);
   }
-  
-  // Обновляем отображение рулетки
-  updateRouletteDisplay(room.players);
 }
 
 // Обновление отображения рулетки
 function updateRouletteDisplay(players) {
-  rouletteSlots.innerHTML = '';
-  const activePlayers = Object.values(players);
-  const totalPlayers = activePlayers.length;
-  
-  if (totalPlayers === 0) return;
-  
-  gameState.slotWidth = 100 / totalPlayers;
-  
-  activePlayers.forEach((player, index) => {
-    if (player && player.color) {
-      createSlot(player, index);
-      if (index === 0) createSlot(player, -1); // Дублирование для бесконечности
-    }
-  });
+  try {
+    rouletteSlots.innerHTML = '';
+    const activePlayers = Object.values(players);
+    const totalPlayers = activePlayers.length;
+    
+    if (totalPlayers === 0) return;
+    
+    gameState.slotWidth = 100 / totalPlayers;
+    
+    activePlayers.forEach((player, index) => {
+      if (player && player.color) {
+        createSlot(player, index);
+        if (index === 0) createSlot(player, -1); // Дублирование для бесконечности
+      }
+    });
+  } catch (error) {
+    console.error('Ошибка обновления рулетки:', error);
+  }
 }
 
 // Создание слота
 function createSlot(player, index) {
-  const slot = document.createElement('div');
-  slot.className = 'roulette-slot';
-  slot.style.backgroundColor = player.color;
-  slot.style.width = `${gameState.slotWidth}%`;
-  slot.style.left = `${index * gameState.slotWidth}%`;
-  
-  const percent = document.createElement('div');
-  percent.className = 'slot-percent';
-  percent.textContent = `${Math.round(100 / Object.keys(gameState.players).length)}%`;
-  percent.style.color = getContrastColor(player.color);
-  
-  slot.appendChild(percent);
-  rouletteSlots.appendChild(slot);
+  try {
+    const slot = document.createElement('div');
+    slot.className = 'roulette-slot';
+    slot.style.backgroundColor = player.color;
+    slot.style.width = `${gameState.slotWidth}%`;
+    slot.style.left = `${index * gameState.slotWidth}%`;
+    
+    const percent = document.createElement('div');
+    percent.className = 'slot-percent';
+    percent.textContent = `${Math.round(100 / Object.keys(gameState.players).length)}%`;
+    percent.style.color = getContrastColor(player.color);
+    
+    slot.appendChild(percent);
+    rouletteSlots.appendChild(slot);
+  } catch (error) {
+    console.error('Ошибка создания слота:', error);
+  }
 }
 
 // Контрастный цвет текста
@@ -325,12 +355,18 @@ function getContrastColor(hexColor) {
 
 // Показать победителя
 function showWinner(winner) {
-  if (winner) {
-    winnerDisplay.innerHTML = `
-      <div class="winner-box" style="background-color: ${winner.color || '#7f5af0'}">
-        Победитель: ${winner.name || 'Неизвестный игрок'}!
-      </div>
-    `;
+  try {
+    if (winner) {
+      winnerDisplay.innerHTML = `
+        <div class="winner-box" style="background-color: ${winner.color || '#7f5af0'}">
+          Победитель: ${winner.name || 'Неизвестный игрок'}!
+        </div>
+      `;
+    } else {
+      winnerDisplay.textContent = '';
+    }
+  } catch (error) {
+    console.error('Ошибка отображения победителя:', error);
   }
 }
 
