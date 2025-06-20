@@ -29,7 +29,7 @@
     </div>
   </div>
   
-  <div id="version">Build 2.8v (GuaranteedReset)</div>
+  <div id="version">Build 2.9v (FixedTimer)</div>
 </div>
 
 <div id="panel">
@@ -66,8 +66,7 @@ const gameState = {
   colors: ['#FF5252', '#4CAF50', '#2196F3', '#FFC107', '#9C27B0', '#00BCD4'],
   usedColors: [],
   slotWidth: 0,
-  serverTimeOffset: 0,
-  lastUpdate: Date.now()
+  serverTimeOffset: 0
 };
 
 // Элементы интерфейса
@@ -84,48 +83,56 @@ const serverTimeRef = db.ref('.info/serverTimeOffset');
 
 // Инициализация
 function initRouletteGame() {
-  // Принудительный сброс при загрузке
-  forceResetGame();
-  
   // Синхронизация времени с сервером
   serverTimeRef.on('value', (snap) => {
     gameState.serverTimeOffset = snap.val() || 0;
   });
 
+  // Принудительный сброс при загрузке
+  resetGame(true);
+  
   placeBetBtn.addEventListener('click', placeBet);
   
   // Слушаем изменения в игре
   gameRef.on('value', (snapshot) => {
     const game = snapshot.val();
-    if (!game) return forceResetGame();
-    updateGameState(game);
+    if (game) {
+      updateGameState(game);
+    }
   });
   
   // Слушаем изменения игроков
   playersRef.on('value', (snapshot) => {
-    const players = snapshot.val();
-    if (!players) return;
+    const players = snapshot.val() || {};
     updatePlayers(players);
+    
+    // Автоматический старт таймера при 2+ игроках
+    if (Object.keys(players).length >= 2 && gameState.status === 'waiting') {
+      startBettingTimer();
+    }
   });
 }
 
-// Принудительный сброс игры
-function forceResetGame() {
-  playersRef.remove().catch(() => {});
+// Получение серверного времени
+function getServerTime() {
+  return Date.now() + gameState.serverTimeOffset;
+}
+
+// Сброс игры
+function resetGame(initial = false) {
+  if (initial) {
+    gameRef.set({
+      status: 'waiting',
+      startTime: null,
+      winner: null,
+      finishTime: null,
+      lastReset: getServerTime()
+    }).catch(console.error);
+  }
   
-  gameRef.set({
-    status: 'waiting',
-    startTime: null,
-    winner: null,
-    finishTime: null,
-    lastUpdate: Date.now() + gameState.serverTimeOffset
-  }).then(() => {
-    resetLocalState();
-  });
-}
-
-// Сброс локального состояния
-function resetLocalState() {
+  playersRef.remove().catch(console.error);
+  
+  // Локальный сброс
   gameState.players = {};
   gameState.usedColors = [];
   gameState.winner = null;
@@ -139,6 +146,14 @@ function resetLocalState() {
   rouletteSlots.innerHTML = '';
   rouletteSlotsWrapper.style.transition = 'none';
   rouletteSlotsWrapper.style.transform = 'translateX(0)';
+}
+
+// Начало отсчета времени ставок
+function startBettingTimer() {
+  gameRef.update({
+    status: 'betting',
+    startTime: getServerTime()
+  }).catch(console.error);
 }
 
 // Размещение ставки
@@ -167,23 +182,10 @@ function placeBet() {
   const playerData = {
     name: currentPlayer.name,
     color: randomColor,
-    betTime: Date.now() + gameState.serverTimeOffset
+    betTime: getServerTime()
   };
   
-  playersRef.child(currentPlayer.id).set(playerData)
-    .then(() => {
-      if (Object.keys(gameState.players).length === 1) {
-        gameRef.update({
-          status: 'betting',
-          startTime: Date.now() + gameState.serverTimeOffset,
-          lastUpdate: Date.now() + gameState.serverTimeOffset
-        });
-      }
-    })
-    .catch(error => {
-      console.error('Ошибка ставки:', error);
-      alert('Ошибка. Попробуйте снова.');
-    });
+  playersRef.child(currentPlayer.id).set(playerData).catch(console.error);
 }
 
 // Обновление состояния игры
@@ -192,10 +194,10 @@ function updateGameState(game) {
   gameState.winner = game.winner || null;
   
   if (game.status === 'betting') {
-    const elapsed = Math.floor((Date.now() + gameState.serverTimeOffset - game.startTime) / 1000);
+    const elapsed = Math.floor((getServerTime() - game.startTime) / 1000);
     gameState.timer = Math.max(0, 30 - elapsed);
     
-    if (gameState.timer <= 0 && Object.keys(gameState.players).length >= 2) {
+    if (gameState.timer <= 0) {
       startRoulette();
     } else {
       updateTimerDisplay();
@@ -205,7 +207,7 @@ function updateGameState(game) {
     timerDisplay.style.display = 'none';
   } else if (game.status === 'finished') {
     showWinner(game.winner);
-    setTimeout(() => forceResetGame(), 10000);
+    setTimeout(resetGame, 10000);
   }
 }
 
@@ -215,7 +217,7 @@ function updatePlayers(players) {
   updateRouletteDisplay();
 }
 
-// Обновление рулетки
+// Обновление отображения рулетки
 function updateRouletteDisplay() {
   rouletteSlots.innerHTML = '';
   const players = Object.values(gameState.players);
@@ -227,7 +229,7 @@ function updateRouletteDisplay() {
   
   players.forEach((player, index) => {
     createSlot(player, index);
-    if (index === 0) createSlot(player, -1);
+    if (index === 0) createSlot(player, -1); // Дублирование для бесконечности
   });
 }
 
@@ -264,7 +266,11 @@ function updateTimerDisplay() {
     timerDisplay.textContent = `Осталось: ${gameState.timer}с`;
     
     if (gameState.timer > 0) {
-      setTimeout(updateTimerDisplay, 1000);
+      setTimeout(() => {
+        const elapsed = Math.floor((getServerTime() - gameRef.startTime) / 1000);
+        gameState.timer = Math.max(0, 30 - elapsed);
+        updateTimerDisplay();
+      }, 1000);
     }
   }
 }
@@ -272,8 +278,7 @@ function updateTimerDisplay() {
 // Запуск рулетки
 function startRoulette() {
   gameRef.update({
-    status: 'spinning',
-    lastUpdate: Date.now() + gameState.serverTimeOffset
+    status: 'spinning'
   }).then(() => {
     const spinDuration = 3000 + Math.random() * 4000;
     const winnerIndex = Math.floor(Math.random() * Object.keys(gameState.players).length);
@@ -290,8 +295,7 @@ function startRoulette() {
         gameRef.update({
           status: 'finished',
           winner: Object.keys(gameState.players)[winnerIndex],
-          finishTime: Date.now() + gameState.serverTimeOffset,
-          lastUpdate: Date.now() + gameState.serverTimeOffset
+          finishTime: getServerTime()
         });
       }, spinDuration);
     }, 10);
