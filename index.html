@@ -6,7 +6,6 @@
   <title>Gizmo App</title>
   <link rel="stylesheet" href="styles/main.css">
   <link rel="stylesheet" href="styles/animation.css">
-  <link rel="stylesheet" href="styles/panel.css">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -16,41 +15,38 @@
   <div id="ring"></div>
 </div>
 <div id="title">Gizmo</div>
+
 <div id="content">
-  <div id="panel">
-    <div class="tab-buttons">
-      <button class="tab-button active" onclick="switchTab('profile')">Профиль</button>
-      <button class="tab-button" onclick="switchTab('shop')">Магазин</button>
-      <button class="tab-button" onclick="window.location.href='pvp-game.html'">PVP</button>
+  <div id="profile" class="tab-content active" style="display: none;">
+    <div class="profile-header">
+      <h2 id="user-nickname">Гость</h2>
+      <p class="telegram-id" id="user-telegram">@username</p>
     </div>
-    
-    <div id="profile" class="tab-content active">
-      <h2>Добро пожаловать, <span id="username">Игрок</span>!</h2>
-      <p>Ваш Telegram: <span id="user-telegram">@username</span></p>
-      <p>Ваш ник: <span id="user-nickname">Гость</span></p>
+    <div class="profile-edit">
       <input type="text" id="nickname-input" placeholder="Новый ник">
-      <button onclick="updateNickname()">Изменить ник</button>
-      <p>Ваш статус: Новичок</p>
+      <button onclick="updateNickname()">Изменить</button>
     </div>
-    
-    <div id="shop" class="tab-content">
-      <div class="shop-item">
-        <h3>🗡️ Меч Дракона</h3>
-        <p style="color: #f8d56b;">100 золотых</p>
-        <button class="buy-btn" data-item="dragon_sword">Купить</button>
-      </div>
-      <div class="shop-item">
-        <h3>🛡️ Щит Рыцаря</h3>
-        <p style="color: #f8d56b;">75 золотых</p>
-        <button class="buy-btn" data-item="knight_shield">Купить</button>
-      </div>
+  </div>
+  
+  <div id="shop" class="tab-content" style="display: none;">
+    <div class="shop-item">
+      <h3>🗡️ Меч Дракона</h3>
+      <p style="color: #f8d56b;">100 золотых</p>
+      <button class="buy-btn" data-item="dragon_sword">Купить</button>
+    </div>
+    <div class="shop-item">
+      <h3>🛡️ Щит Рыцаря</h3>
+      <p style="color: #f8d56b;">75 золотых</p>
+      <button class="buy-btn" data-item="knight_shield">Купить</button>
     </div>
   </div>
 </div>
 
 <script src="scripts/main.js"></script>
 <script src="scripts/animation.js"></script>
+<script src="scripts/menu.js"></script>
 <script src="scripts/shop.js"></script>
+
 <script>
   // Инициализация Firebase
   const firebaseConfig = {
@@ -61,19 +57,10 @@
   const app = firebase.initializeApp(firebaseConfig);
   window.db = firebase.database(app);
   
-  // Инициализация магазина
-  document.querySelectorAll('.buy-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      const item = this.getAttribute('data-item');
-      purchaseItem(item);
-    });
-  });
-  
-  function purchaseItem(itemId) {
-    // Здесь должна быть логика покупки
-    alert(`Покупка: ${itemId}`);
-    // В реальном приложении здесь будет запрос к Firebase
-  }
+  // Показываем профиль после анимации
+  setTimeout(() => {
+    document.getElementById('profile').style.display = 'block';
+  }, 5000);
 </script>
 </body>
 </html>
