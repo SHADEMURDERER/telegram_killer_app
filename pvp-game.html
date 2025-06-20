@@ -25,11 +25,11 @@
     <div id="winner-display"></div>
     <div id="bet-controls">
       <button id="place-bet-btn" class="bet-btn">Сделать ставку</button>
-      <div id="timer-display" style="display: none;">Осталось: 30с</div>
+      <div id="timer-display" style="display: none;">Осталось: <span id="time-left">30</span>с</div>
     </div>
   </div>
   
-  <div id="version">Build 2.9v (FixedTimer)</div>
+  <div id="version">Build 3.0v (Stable)</div>
 </div>
 
 <div id="panel">
@@ -54,7 +54,8 @@ const db = firebase.database();
 // Текущий игрок
 const currentPlayer = {
   id: window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 'player_' + Math.random().toString(36).slice(2, 9),
-  name: window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || 'Игрок'
+  name: window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || 'Игрок',
+  lastActive: Date.now()
 };
 
 // Состояние игры
@@ -66,7 +67,8 @@ const gameState = {
   colors: ['#FF5252', '#4CAF50', '#2196F3', '#FFC107', '#9C27B0', '#00BCD4'],
   usedColors: [],
   slotWidth: 0,
-  serverTimeOffset: 0
+  serverTimeOffset: 0,
+  lastUpdate: Date.now()
 };
 
 // Элементы интерфейса
@@ -75,6 +77,7 @@ const rouletteSlotsWrapper = document.getElementById('roulette-slots-wrapper');
 const winnerDisplay = document.getElementById('winner-display');
 const placeBetBtn = document.getElementById('place-bet-btn');
 const timerDisplay = document.getElementById('timer-display');
+const timeLeftSpan = document.getElementById('time-left');
 
 // Ссылки Firebase
 const gameRef = db.ref('pvpRoulette/game');
@@ -91,6 +94,11 @@ function initRouletteGame() {
   // Принудительный сброс при загрузке
   resetGame(true);
   
+  // Отслеживание активности игрока
+  document.addEventListener('visibilitychange', updatePlayerActivity);
+  window.addEventListener('focus', updatePlayerActivity);
+  setInterval(updatePlayerActivity, 10000);
+  
   placeBetBtn.addEventListener('click', placeBet);
   
   // Слушаем изменения в игре
@@ -106,11 +114,45 @@ function initRouletteGame() {
     const players = snapshot.val() || {};
     updatePlayers(players);
     
-    // Автоматический старт таймера при 2+ игроках
-    if (Object.keys(players).length >= 2 && gameState.status === 'waiting') {
+    // Проверяем активность игроков
+    checkPlayersActivity(players);
+    
+    // Запускаем таймер при 2+ активных игроках
+    if (countActivePlayers(players) >= 2 && gameState.status === 'waiting') {
       startBettingTimer();
     }
   });
+}
+
+// Обновление активности игрока
+function updatePlayerActivity() {
+  if (currentPlayer.id && gameState.players[currentPlayer.id]) {
+    playersRef.child(currentPlayer.id).update({
+      lastActive: Date.now()
+    });
+  }
+}
+
+// Проверка активности игроков
+function checkPlayersActivity(players) {
+  const now = Date.now();
+  const inactiveTime = 30000; // 30 секунд
+  
+  Object.entries(players).forEach(([playerId, player]) => {
+    if (now - (player.lastActive || 0) > inactiveTime) {
+      playersRef.child(playerId).remove();
+    }
+  });
+}
+
+// Подсчет активных игроков
+function countActivePlayers(players) {
+  const now = Date.now();
+  const inactiveTime = 30000; // 30 секунд
+  
+  return Object.values(players).filter(player => 
+    now - (player.lastActive || 0) <= inactiveTime
+  ).length;
 }
 
 // Получение серверного времени
@@ -130,10 +172,7 @@ function resetGame(initial = false) {
     }).catch(console.error);
   }
   
-  playersRef.remove().catch(console.error);
-  
-  // Локальный сброс
-  gameState.players = {};
+  // Не удаляем игроков при сбросе, только при выходе по таймауту
   gameState.usedColors = [];
   gameState.winner = null;
   gameState.status = 'waiting';
@@ -182,7 +221,8 @@ function placeBet() {
   const playerData = {
     name: currentPlayer.name,
     color: randomColor,
-    betTime: getServerTime()
+    betTime: getServerTime(),
+    lastActive: Date.now()
   };
   
   playersRef.child(currentPlayer.id).set(playerData).catch(console.error);
@@ -196,8 +236,9 @@ function updateGameState(game) {
   if (game.status === 'betting') {
     const elapsed = Math.floor((getServerTime() - game.startTime) / 1000);
     gameState.timer = Math.max(0, 30 - elapsed);
+    timeLeftSpan.textContent = gameState.timer;
     
-    if (gameState.timer <= 0) {
+    if (gameState.timer <= 0 && countActivePlayers(gameState.players) >= 2) {
       startRoulette();
     } else {
       updateTimerDisplay();
@@ -220,14 +261,15 @@ function updatePlayers(players) {
 // Обновление отображения рулетки
 function updateRouletteDisplay() {
   rouletteSlots.innerHTML = '';
-  const players = Object.values(gameState.players);
-  const totalPlayers = players.length;
+  const activePlayers = Object.values(gameState.players)
+    .filter(player => Date.now() - (player.lastActive || 0) <= 30000);
   
+  const totalPlayers = activePlayers.length;
   if (totalPlayers === 0) return;
   
   gameState.slotWidth = 100 / totalPlayers;
   
-  players.forEach((player, index) => {
+  activePlayers.forEach((player, index) => {
     createSlot(player, index);
     if (index === 0) createSlot(player, -1); // Дублирование для бесконечности
   });
@@ -243,7 +285,7 @@ function createSlot(player, index) {
   
   const percent = document.createElement('div');
   percent.className = 'slot-percent';
-  percent.textContent = `${Math.round(100 / Object.keys(gameState.players).length)}%`;
+  percent.textContent = `${Math.round(100 / countActivePlayers(gameState.players))}%`;
   percent.style.color = getContrastColor(player.color);
   
   slot.appendChild(percent);
@@ -263,7 +305,7 @@ function getContrastColor(hexColor) {
 function updateTimerDisplay() {
   if (gameState.status === 'betting' && gameState.timer >= 0) {
     timerDisplay.style.display = 'block';
-    timerDisplay.textContent = `Осталось: ${gameState.timer}с`;
+    timeLeftSpan.textContent = gameState.timer;
     
     if (gameState.timer > 0) {
       setTimeout(() => {
@@ -280,8 +322,11 @@ function startRoulette() {
   gameRef.update({
     status: 'spinning'
   }).then(() => {
+    const activePlayers = Object.values(gameState.players)
+      .filter(player => Date.now() - (player.lastActive || 0) <= 30000);
+    
     const spinDuration = 3000 + Math.random() * 4000;
-    const winnerIndex = Math.floor(Math.random() * Object.keys(gameState.players).length);
+    const winnerIndex = Math.floor(Math.random() * activePlayers.length);
     const targetPosition = 100 - (winnerIndex * gameState.slotWidth);
     
     rouletteSlotsWrapper.style.transition = 'none';
@@ -292,9 +337,13 @@ function startRoulette() {
       rouletteSlotsWrapper.style.transform = `translateX(-${targetPosition}%)`;
       
       setTimeout(() => {
+        const winnerId = Object.keys(gameState.players).find(key => 
+          gameState.players[key].lastActive >= Date.now() - 30000
+        )[winnerIndex];
+        
         gameRef.update({
           status: 'finished',
-          winner: Object.keys(gameState.players)[winnerIndex],
+          winner: winnerId,
           finishTime: getServerTime()
         });
       }, spinDuration);
