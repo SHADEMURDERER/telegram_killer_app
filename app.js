@@ -1,5 +1,5 @@
 // Проверка alert
-alert("Сообщение на русском!");  // Кириллица должна быть видна прямо в коде
+alert("Сообщение на русском!");
 
 // Инициализация Telegram WebApp
 if (window.Telegram?.WebApp) {
@@ -7,10 +7,3 @@ if (window.Telegram?.WebApp) {
     tg.expand();
     tg.MainButton.setText("Продолжить").show();
 }
-
-function adjustViewport() {
-  document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
-}
-
-window.addEventListener('resize', adjustViewport);
-adjustViewport();

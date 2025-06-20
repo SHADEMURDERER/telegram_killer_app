@@ -2,24 +2,14 @@
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Gizmo PVP (Комнаты)</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <link rel="stylesheet" href="styles/main.css">
   <link rel="stylesheet" href="styles/pvp-game.css">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <style>
-    :root {
-      --vh: calc(var(--tg-viewport-height, 1vh) * 100);
-    }
-    body {
-      height: 100vh;
-      height: calc(var(--vh, 1vh) * 100);
-    }
-  </style>
 </head>
 <body>
-
 <div id="pvp-container">
   <div class="header">
     <h2>🎮 Комнаты PVP</h2>
@@ -40,10 +30,9 @@
     <div id="game-status"></div>
   </div>
   
-  <div id="version">Build 2.4v (FixedSystem)</div>
+  <div id="version">Build 2.1v (FixedSystem)</div>
 </div>
 
-<!-- Нижнее меню -->
 <div id="panel">
   <div class="tab-buttons">
     <button class="tab-button" onclick="window.location.href='index.html'">Профиль</button>
