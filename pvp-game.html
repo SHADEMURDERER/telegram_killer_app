@@ -31,16 +31,20 @@
     </div>
   </div>
 
-  <!-- Добавленное меню -->
+  <!-- Меню -->
   <div id="main-menu">
     <div class="menu-buttons">
       <button class="menu-btn" onclick="window.location.href='index.html'">
-        <span class="btn-icon">🏠</span>
-        <span class="btn-text">Главная</span>
+        <span class="btn-icon">👤</span>
+        <span class="btn-text">Профиль</span>
       </button>
       <button class="menu-btn" onclick="window.location.href='index.html#shop'">
         <span class="btn-icon">🛒</span>
         <span class="btn-text">Магазин</span>
+      </button>
+      <button class="menu-btn" disabled>
+        <span class="btn-icon">⚔️</span>
+        <span class="btn-text">PVP</span>
       </button>
     </div>
   </div>
@@ -49,26 +53,11 @@
     // Инициализация Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
-      databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com",
-      projectId: "gizmo-27843"
+      databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
     };
     
     const app = firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-
-    // Загрузка данных игрока
-    let currentPlayer = {};
-    const savedPlayer = sessionStorage.getItem('currentPlayer');
-    if (savedPlayer) {
-      currentPlayer = JSON.parse(savedPlayer);
-    } else {
-      currentPlayer = {
-        id: 'local_' + Math.random().toString(36).substring(2, 9),
-        name: 'Гость',
-        username: 'guest_' + Math.random().toString(36).substring(2, 6),
-        balance: 50
-      };
-    }
 
     // Состояние игры
     const gameState = {
@@ -95,11 +84,11 @@
     // Ссылки Firebase
     const roomRef = db.ref('pvpRoulette/room');
     const serverTimeRef = db.ref('.info/serverTimeOffset');
-    const presenceRef = currentPlayer.id ? db.ref(`userPresence/${currentPlayer.id}`) : null;
+    const presenceRef = currentPlayer ? db.ref(`userPresence/${currentPlayer.id}`) : null;
 
     // Инициализация игрока
     function initPlayer() {
-      if (currentPlayer.id && currentPlayer.id.startsWith('tg_')) {
+      if (currentPlayer && currentPlayer.id.startsWith('tg_')) {
         db.ref(`users/${currentPlayer.id}`).update({
           lastLogin: firebase.database.ServerValue.TIMESTAMP,
           isOnline: true
@@ -178,7 +167,7 @@
 
     // Обработчик ставки
     async function placeBetHandler() {
-      if (gameState.isPlacingBet || !currentPlayer.id) return;
+      if (gameState.isPlacingBet || !currentPlayer?.id) return;
       gameState.isPlacingBet = true;
       elements.placeBetBtn.disabled = true;
       elements.placeBetBtn.textContent = 'Ставка принята';
