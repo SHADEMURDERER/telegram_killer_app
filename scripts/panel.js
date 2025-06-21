@@ -8,19 +8,38 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     </div>
   `;
+  
   document.body.insertAdjacentHTML('beforeend', panelHTML);
+  
   const currentPage = 
     window.location.pathname.includes('pvp-game.html') ? 'pvp' :
     window.location.hash === '#shop' ? 'shop' : 'profile';
+  
   document.querySelector(`.tab-button[data-page="${currentPage}"]`).classList.add('active');
+  
   document.querySelectorAll('.tab-button').forEach(btn => {
     btn.addEventListener('click', () => {
       const page = btn.getAttribute('data-page');
       switch(page) {
-        case 'profile': window.location.href = 'index.html'; break;
-        case 'shop': window.location.href = 'index.html#shop'; break;
-        case 'pvp': window.location.href = 'pvp-game.html'; break;
+        case 'profile': 
+          window.location.href = 'index.html'; 
+          break;
+        case 'shop': 
+          window.location.href = 'index.html#shop'; 
+          break;
+        case 'pvp': 
+          window.location.href = 'pvp-game.html'; 
+          break;
       }
     });
   });
+  
+  // Анимация появления панели после загрузки
+  setTimeout(() => {
+    const panel = document.getElementById('panel');
+    if (panel) {
+      panel.style.bottom = '0';
+      panel.style.opacity = '1';
+    }
+  }, 6000); // Задержка соответствует времени анимации
 });
