@@ -1,16 +1,14 @@
-let currentPlayer = {
+// Инициализация глобального объекта игрока
+window.currentPlayer = {
   id: null,
-  name: 'Игрок',
+  name: 'Гость',
   username: '@username',
-  balance: 0,
+  balance: 100,
   inventory: [],
-  stats: {
-    wins: 0,
-    losses: 0,
-    draws: 0
-  }
+  stats: { wins: 0, losses: 0, draws: 0 }
 };
 
+// Конфигурация Firebase (объявлена только здесь)
 const firebaseConfig = {
   apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
   databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com",
@@ -18,10 +16,15 @@ const firebaseConfig = {
   appId: "1:7664399240:web:3a9c8a7b3b3c9b3c8a7b3b"
 };
 
+// Инициализация Firebase
 function initFirebase() {
   try {
-    const app = firebase.initializeApp(firebaseConfig);
-    window.db = firebase.database(app);
+    // Проверяем, не инициализирован ли уже Firebase
+    if (!firebase.apps.length) {
+      const app = firebase.initializeApp(firebaseConfig);
+      window.db = firebase.database(app);
+      return true;
+    }
     return true;
   } catch (error) {
     console.error('Ошибка инициализации Firebase:', error);
@@ -29,6 +32,7 @@ function initFirebase() {
   }
 }
 
+// Валидация данных Telegram
 async function validateTelegramData(initData) {
   try {
     const encoder = new TextEncoder();
@@ -66,17 +70,22 @@ async function validateTelegramData(initData) {
   }
 }
 
+// Инициализация Telegram WebApp
 async function initTelegram() {
-  if (!window.Telegram?.WebApp) return false;
+  if (!window.Telegram?.WebApp) {
+    console.log('Telegram WebApp не доступен');
+    initLocalUser();
+    return false;
+  }
 
   try {
     if (Telegram.WebApp.initData) {
       const isValid = await validateTelegramData(Telegram.WebApp.initData);
-      if (!isValid) throw new Error('Invalid Telegram data');
+      if (!isValid) throw new Error('Невалидные данные Telegram');
     }
 
     const user = Telegram.WebApp.initDataUnsafe?.user;
-    if (!user?.id) throw new Error('No Telegram user data');
+    if (!user?.id) throw new Error('Нет данных пользователя');
 
     const userId = `tg_${user.id}`;
     const userRef = firebase.database().ref(`users/${userId}`);
@@ -84,7 +93,7 @@ async function initTelegram() {
     const snapshot = await userRef.once('value');
     const userData = snapshot.val() || {};
 
-    currentPlayer = {
+    window.currentPlayer = {
       id: userId,
       name: userData.name || user.first_name || 'Игрок',
       username: userData.username || (user.username ? `@${user.username}` : `tg://user?id=${user.id}`),
@@ -107,86 +116,32 @@ async function initTelegram() {
   }
 }
 
+// Инициализация локального пользователя
 function initLocalUser() {
   const savedUser = localStorage.getItem('localUser');
   if (savedUser) {
-    currentPlayer = JSON.parse(savedUser);
+    window.currentPlayer = JSON.parse(savedUser);
   } else {
-    currentPlayer = {
-      id: `local_${Math.random().toString(36).substr(2, 9)}`,
-      name: 'Гость',
-      username: `guest_${Math.random().toString(36).substr(2, 6)}`,
-      balance: 50,
-      inventory: [],
-      stats: { wins: 0, losses: 0, draws: 0 }
-    };
-    localStorage.setItem('localUser', JSON.stringify(currentPlayer));
+    window.currentPlayer.id = `local_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem('localUser', JSON.stringify(window.currentPlayer));
   }
 }
 
-function updateUserPresence(isOnline) {
-  if (!currentPlayer.id || !currentPlayer.id.startsWith('tg_')) return;
-  
-  const presenceRef = firebase.database().ref(`userPresence/${currentPlayer.id}`);
-  presenceRef.update({
-    isOnline,
-    lastSeen: firebase.database.ServerValue.TIMESTAMP
-  });
-}
-
-function trackUserAction(action, data = {}) {
-  if (!currentPlayer.id) return;
-
-  const actionRef = firebase.database().ref(`userActions/${currentPlayer.id}`).push();
-  actionRef.set({
-    action,
-    ...data,
-    timestamp: firebase.database.ServerValue.TIMESTAMP,
-    userAgent: navigator.userAgent,
-    page: window.location.pathname
-  });
-}
-
-async function updateNickname(newNickname) {
-  if (!newNickname || !currentPlayer.id) return false;
-
-  try {
-    if (currentPlayer.id.startsWith('tg_')) {
-      await firebase.database().ref(`users/${currentPlayer.id}/name`).set(newNickname);
-    } else {
-      currentPlayer.name = newNickname;
-      localStorage.setItem('localUser', JSON.stringify(currentPlayer));
-    }
-    
-    trackUserAction('nickname_change', { oldName: currentPlayer.name, newName: newNickname });
-    currentPlayer.name = newNickname;
-    return true;
-  } catch (error) {
-    console.error('Ошибка изменения ника:', error);
-    return false;
-  }
-}
-
-function handleBeforeUnload() {
-  updateUserPresence(false);
-  trackUserAction('page_leave');
-}
-
-function initEventListeners() {
-  window.addEventListener('beforeunload', handleBeforeUnload);
-  
-  if (window.Telegram?.WebApp) {
-    Telegram.WebApp.onEvent('viewportChanged', (e) => {
-      updateUserPresence(e.isExpanded);
-    });
-  }
-}
-
+// Инициализация приложения
 async function initApp() {
-  initFirebase();
+  if (!initFirebase()) {
+    console.error('Не удалось инициализировать Firebase');
+    initLocalUser();
+    return;
+  }
+
   await initTelegram();
-  initEventListeners();
-  trackUserAction('page_visit');
+  
+  // Инициализация меню
+  if (typeof initMenu === 'function') {
+    initMenu();
+  }
 }
 
+// Запуск при загрузке страницы
 document.addEventListener('DOMContentLoaded', initApp);
