@@ -1,113 +1,134 @@
-function initMenu() {
-  const menuHTML = `
-    <div id="main-menu">
-      <div class="menu-buttons">
-        <button class="menu-btn profile-btn">
-          <span class="btn-icon">👤</span>
-          <span class="btn-text">Профиль</span>
-        </button>
-        <button class="menu-btn shop-btn">
-          <span class="btn-icon">🛒</span>
-          <span class="btn-text">Магазин</span>
-        </button>
-        <button class="menu-btn pvp-btn">
-          <span class="btn-icon">⚔️</span>
-          <span class="btn-text">PVP</span>
-        </button>
-      </div>
-    </div>
-  `;
-  
-  document.body.insertAdjacentHTML('beforeend', menuHTML);
+// Глобальная переменная для игрока
+window.currentPlayer = {
+  id: null,
+  name: 'Гость',
+  username: '@username',
+  balance: 100,
+  inventory: [],
+  stats: { wins: 0, losses: 0, draws: 0 }
+};
 
-  setTimeout(() => {
-    const buttons = document.querySelectorAll('.menu-btn');
-    buttons.forEach((btn, index) => {
-      btn.style.transform = 'translateY(100px)';
-      btn.style.opacity = '0';
-      btn.style.transition = `all 0.5s ease ${index * 0.1}s`;
-      
-      setTimeout(() => {
-        btn.style.transform = 'translateY(0)';
-        btn.style.opacity = '1';
-      }, 100);
-    });
-  }, 2500);
+// Конфиг Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
+  databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com",
+  projectId: "gizmo-27843",
+  appId: "1:7664399240:web:3a9c8a7b3b3c9b3c8a7b3b"
+};
 
-  document.querySelector('.profile-btn').addEventListener('click', showProfile);
-  document.querySelector('.shop-btn').addEventListener('click', showShop);
-  document.querySelector('.pvp-btn').addEventListener('click', () => {
-    window.location.href = 'pvp-game.html';
-  });
-}
-
-function showProfile() {
-  const profileHTML = `
-    <div id="profile-panel" class="slide-panel">
-      <div class="panel-content">
-        <h2>${currentPlayer.name}</h2>
-        <p class="telegram-username">${currentPlayer.username}</p>
-        <div class="nickname-edit">
-          <input type="text" id="nickname-input" placeholder="Новый ник" value="${currentPlayer.name}">
-          <button id="update-nickname-btn">Изменить</button>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  document.body.insertAdjacentHTML('beforeend', profileHTML);
-  animatePanel('profile-panel');
-  
-  document.getElementById('update-nickname-btn').addEventListener('click', updateNickname);
-}
-
-function showShop() {
-  const shopHTML = `
-    <div id="shop-panel" class="slide-panel">
-      <div class="panel-content">
-        <div class="shop-item">
-          <h3>🗡️ Меч Дракона</h3>
-          <p class="price">100 золотых</p>
-          <button class="buy-btn" data-item="dragon_sword">Купить</button>
-        </div>
-        <div class="shop-item">
-          <h3>🛡️ Щит Рыцаря</h3>
-          <p class="price">75 золотых</p>
-          <button class="buy-btn" data-item="knight_shield">Купить</button>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  document.body.insertAdjacentHTML('beforeend', shopHTML);
-  animatePanel('shop-panel');
-}
-
-function animatePanel(panelId) {
-  const panel = document.getElementById(panelId);
-  panel.style.height = '0';
-  panel.style.opacity = '0';
-  
-  setTimeout(() => {
-    panel.style.height = '70vh';
-    panel.style.opacity = '1';
-    panel.querySelector('.panel-content').classList.add('active');
-  }, 10);
-  
-  panel.addEventListener('click', (e) => {
-    if (e.target === panel) {
-      panel.style.height = '0';
-      panel.style.opacity = '0';
-      setTimeout(() => panel.remove(), 500);
-    }
-  });
-}
-
-function updateNickname() {
-  const newNickname = document.getElementById('nickname-input').value.trim();
-  if (newNickname && newNickname !== currentPlayer.name) {
-    currentPlayer.name = newNickname;
-    sessionStorage.setItem('currentPlayer', JSON.stringify(currentPlayer));
-    document.querySelector('#profile-panel h2').textContent = newNickname;
+// Инициализация Firebase
+function initFirebase() {
+  try {
+    const app = firebase.initializeApp(firebaseConfig);
+    window.db = firebase.database(app);
+    return true;
+  } catch (error) {
+    console.error('Ошибка Firebase:', error);
+    return false;
   }
 }
+
+// Валидация данных Telegram
+async function validateTelegramData(initData) {
+  try {
+    const encoder = new TextEncoder();
+    const secretKey = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode('WebAppData'),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+
+    const urlParams = new URLSearchParams(initData);
+    const hash = urlParams.get('hash');
+    urlParams.delete('hash');
+
+    const dataToCheck = Array.from(urlParams.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => `${key}=${value}`)
+      .join('\n');
+
+    const secret = await crypto.subtle.sign(
+      'HMAC',
+      secretKey,
+      encoder.encode(dataToCheck)
+    );
+
+    const hexSecret = Array.from(new Uint8Array(secret))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    return hexSecret === hash;
+  } catch (error) {
+    console.error('Ошибка валидации:', error);
+    return false;
+  }
+}
+
+// Инициализация Telegram
+async function initTelegram() {
+  if (!window.Telegram?.WebApp) return false;
+
+  try {
+    if (Telegram.WebApp.initData) {
+      const isValid = await validateTelegramData(Telegram.WebApp.initData);
+      if (!isValid) throw new Error('Invalid data');
+    }
+
+    const user = Telegram.WebApp.initDataUnsafe?.user;
+    if (!user?.id) throw new Error('No user data');
+
+    const userId = `tg_${user.id}`;
+    const userRef = db.ref(`users/${userId}`);
+
+    const snapshot = await userRef.once('value');
+    const userData = snapshot.val() || {};
+
+    currentPlayer = {
+      id: userId,
+      name: userData.name || user.first_name || 'Игрок',
+      username: userData.username || (user.username ? `@${user.username}` : `tg://user?id=${user.id}`),
+      balance: userData.balance || 100,
+      inventory: userData.inventory || [],
+      stats: userData.stats || { wins: 0, losses: 0, draws: 0 }
+    };
+
+    await userRef.update({
+      lastLogin: firebase.database.ServerValue.TIMESTAMP,
+      isOnline: true
+    });
+
+    Telegram.WebApp.expand();
+    return true;
+  } catch (error) {
+    console.error('Ошибка Telegram:', error);
+    initLocalUser();
+    return false;
+  }
+}
+
+// Локальный пользователь
+function initLocalUser() {
+  const savedUser = localStorage.getItem('localUser');
+  if (savedUser) {
+    currentPlayer = JSON.parse(savedUser);
+  } else {
+    currentPlayer.id = `local_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem('localUser', JSON.stringify(currentPlayer));
+  }
+}
+
+// Инициализация приложения
+async function initApp() {
+  initFirebase();
+  await initTelegram();
+  
+  // Инициализация меню
+  if (!document.getElementById('main-menu')) {
+    initMenu();
+  }
+}
+
+// Запуск при загрузке
+document.addEventListener('DOMContentLoaded', initApp);

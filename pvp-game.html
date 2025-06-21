@@ -9,6 +9,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="scripts/main.js"></script>
 </head>
 <body>
   <div id="pvp-container">
@@ -32,7 +33,7 @@
   </div>
 
   <!-- Меню -->
-  <div id="main-menu">
+  <div id="main-menu" style="opacity:0">
     <div class="menu-buttons">
       <button class="menu-btn" onclick="window.location.href='index.html'">
         <span class="btn-icon">👤</span>
@@ -50,389 +51,373 @@
   </div>
 
   <script>
-    // Инициализация Firebase
-    const firebaseConfig = {
-      apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
-      databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
-    };
-    
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
-    // Состояние игры
-    const gameState = {
-      colors: ['#FF5252','#4CAF50','#2196F3','#FFC107','#9C27B0','#00BCD4'],
-      slotWidth: 0,
-      serverTimeOffset: 0,
-      isPlacingBet: false,
-      timerInterval: null,
-      currentAnimation: null,
-      currentRoom: null
-    };
-
-    // Элементы интерфейса
-    const elements = {
-      rouletteSlots: document.getElementById('roulette-slots'),
-      rouletteSlotsWrapper: document.getElementById('roulette-slots-wrapper'),
-      winnerDisplay: document.getElementById('winner-display'),
-      placeBetBtn: document.getElementById('place-bet-btn'),
-      timerDisplay: document.getElementById('timer-display'),
-      timeLeftSpan: document.getElementById('time-left'),
-      rouletteArrow: document.getElementById('roulette-arrow')
-    };
-
-    // Ссылки Firebase
-    const roomRef = db.ref('pvpRoulette/room');
-    const serverTimeRef = db.ref('.info/serverTimeOffset');
-    const presenceRef = currentPlayer ? db.ref(`userPresence/${currentPlayer.id}`) : null;
-
-    // Инициализация игрока
-    function initPlayer() {
-      if (currentPlayer && currentPlayer.id.startsWith('tg_')) {
-        db.ref(`users/${currentPlayer.id}`).update({
-          lastLogin: firebase.database.ServerValue.TIMESTAMP,
-          isOnline: true
-        });
-      }
-      initPresenceTracking();
-    }
-
-    // Отслеживание активности
-    function initPresenceTracking() {
-      if (!presenceRef) return;
-      
-      presenceRef.set(true);
-      
-      window.addEventListener('beforeunload', () => {
-        presenceRef.set(false);
-      });
-      
-      if (window.Telegram?.WebApp) {
-        Telegram.WebApp.onEvent('viewportChanged', (e) => {
-          presenceRef.set(e.isExpanded);
-        });
-      }
-    }
-
-    // Проверка неактивных игроков
-    function checkInactivePlayers() {
-      roomRef.child('players').once('value', snap => {
-        const players = snap.val() || {};
-        const now = Date.now();
-        Object.entries(players).forEach(([id, player]) => {
-          if (now - player.lastActive > 30000) {
-            roomRef.child(`players/${id}`).remove();
-          }
-        });
-      });
-    }
-
     // Инициализация игры
-    function initRouletteGame() {
-      serverTimeRef.on('value', snap => {
-        gameState.serverTimeOffset = snap.val() || 0;
-      });
-      
-      roomRef.once('value').then(snap => {
-        if (!snap.exists()) resetRoom();
-      });
-      
-      elements.placeBetBtn.addEventListener('click', placeBetHandler);
-      roomRef.on('value', roomListener);
-      setInterval(checkInactivePlayers, 60000);
-    }
+    document.addEventListener('DOMContentLoaded', function() {
+      // Плавное появление меню
+      setTimeout(() => {
+        const menu = document.getElementById('main-menu');
+        if (menu) menu.style.opacity = '1';
+      }, 500);
 
-    // Обработчик изменений в комнате
-    function roomListener(snap) {
-      const room = snap.val();
-      if (!room) return resetRoom();
-      
-      gameState.currentRoom = room;
-      const validPlayers = {};
-      
-      if (room.players) {
-        Object.entries(room.players).forEach(([id, player]) => {
-          if (player?.color && player?.name && player?.lastActive) {
-            validPlayers[id] = player;
-          }
-        });
+      // Проверяем инициализацию currentPlayer
+      if (!window.currentPlayer) {
+        window.currentPlayer = {
+          id: 'local_' + Math.random().toString(36).substring(2, 9),
+          name: 'Гость',
+          username: 'guest_' + Math.random().toString(36).substring(2, 6),
+          balance: 50
+        };
       }
-      
-      if (Object.keys(validPlayers).length !== Object.keys(room.players || {}).length) {
-        return roomRef.child('players').set(validPlayers);
-      }
-      
-      updateUI(room);
-    }
 
-    // Обработчик ставки
-    async function placeBetHandler() {
-      if (gameState.isPlacingBet || !currentPlayer?.id) return;
-      gameState.isPlacingBet = true;
-      elements.placeBetBtn.disabled = true;
-      elements.placeBetBtn.textContent = 'Ставка принята';
-      
-      try {
-        await roomRef.transaction(room => {
-          if (!room) room = { status: 'waiting', players: {}, startTime: null, winner: null };
-          if (room.status !== 'waiting' && room.status !== 'betting') throw new Error('Ставки закрыты');
-          if (room.players?.[currentPlayer.id]) throw new Error('Вы уже сделали ставку');
-          
-          const usedColors = Object.values(room.players || {}).map(p => p.color).filter(Boolean);
-          const availableColor = gameState.colors.find(c => !usedColors.includes(c)) || gameState.colors[0];
-          
-          room.players = room.players || {};
-          room.players[currentPlayer.id] = {
-            name: currentPlayer.name,
-            username: currentPlayer.username,
-            color: availableColor,
-            lastActive: Date.now(),
-            betAmount: 10
-          };
-          
-          if (Object.keys(room.players).length >= 2 && room.status === 'waiting') {
-            room.status = 'betting';
-            room.startTime = Date.now() + gameState.serverTimeOffset;
-          }
-          
-          return room;
-        });
-        
-        if (currentPlayer.id.startsWith('tg_')) {
-          await db.ref(`users/${currentPlayer.id}/balance`).transaction(balance => {
-            return (balance || 100) - 10;
-          });
-        }
-      } catch(err) {
-        alert(err.message);
-      } finally {
-        gameState.isPlacingBet = false;
-        updateButtonState();
-      }
-    }
-
-    // Обновление состояния кнопки
-    function updateButtonState() {
-      roomRef.once('value').then(snap => {
-        const room = snap.val();
-        if (room?.players?.[currentPlayer.id]) {
-          elements.placeBetBtn.disabled = true;
-          elements.placeBetBtn.textContent = 'Вы в игре';
-        } else {
-          elements.placeBetBtn.disabled = false;
-          elements.placeBetBtn.textContent = 'Сделать ставку (10💰)';
-        }
-      });
-    }
-
-    // Сброс комнаты
-    function resetRoom() {
-      clearTimer();
-      if (gameState.currentAnimation) {
-        cancelAnimationFrame(gameState.currentAnimation);
-        gameState.currentAnimation = null;
-      }
-      
-      const roomData = {
-        status: 'waiting',
-        players: {},
-        startTime: null,
-        winner: null,
-        lastReset: Date.now() + gameState.serverTimeOffset
+      // Инициализация Firebase
+      const firebaseConfig = {
+        apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
+        databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
       };
       
-      return roomRef.set(roomData);
-    }
+      const app = firebase.initializeApp(firebaseConfig, 'pvpInstance');
+      const db = firebase.database(app);
 
-    // Обновление интерфейса
-    function updateUI(room) {
-      clearTimer();
-      
-      switch(room.status) {
-        case 'waiting':
-          updateButtonState();
-          elements.timerDisplay.style.display = 'none';
-          elements.winnerDisplay.textContent = '';
-          break;
-          
-        case 'betting':
-          updateButtonState();
-          if (room.startTime) startTimer(room.startTime);
-          break;
-          
-        case 'spinning':
-          elements.placeBetBtn.disabled = true;
-          elements.timerDisplay.style.display = 'none';
-          break;
-          
-        case 'finished':
-          showWinner(room.winner);
-          elements.placeBetBtn.disabled = true;
-          elements.timerDisplay.style.display = 'none';
-          break;
+      // Состояние игры
+      const gameState = {
+        colors: ['#FF5252','#4CAF50','#2196F3','#FFC107','#9C27B0','#00BCD4'],
+        slotWidth: 0,
+        serverTimeOffset: 0,
+        isPlacingBet: false,
+        timerInterval: null,
+        currentAnimation: null,
+        currentRoom: null
+      };
+
+      // Элементы интерфейса
+      const elements = {
+        rouletteSlots: document.getElementById('roulette-slots'),
+        rouletteSlotsWrapper: document.getElementById('roulette-slots-wrapper'),
+        winnerDisplay: document.getElementById('winner-display'),
+        placeBetBtn: document.getElementById('place-bet-btn'),
+        timerDisplay: document.getElementById('timer-display'),
+        timeLeftSpan: document.getElementById('time-left'),
+        rouletteArrow: document.getElementById('roulette-arrow')
+      };
+
+      // Инициализация игры
+      function initGame() {
+        firebase.database().ref('.info/serverTimeOffset').on('value', snap => {
+          gameState.serverTimeOffset = snap.val() || 0;
+        });
+
+        firebase.database().ref('pvpRoulette/room').once('value').then(snap => {
+          if (!snap.exists()) resetRoom();
+        });
+
+        elements.placeBetBtn.addEventListener('click', placeBetHandler);
+        firebase.database().ref('pvpRoulette/room').on('value', roomListener);
+        setInterval(checkInactivePlayers, 60000);
       }
-      
-      updateRouletteDisplay(room.players || {});
-    }
 
-    // Запуск таймера
-    function startTimer(startTime) {
-      clearTimer();
-      elements.timerDisplay.style.display = 'block';
-      
-      function updateTimer() {
-        const elapsed = Math.floor((Date.now() + gameState.serverTimeOffset - startTime) / 1000);
-        const timeLeft = Math.max(0, 30 - elapsed);
-        elements.timeLeftSpan.textContent = timeLeft;
+      // Обработчик ставки
+      async function placeBetHandler() {
+        if (gameState.isPlacingBet || !currentPlayer?.id) return;
         
-        if (timeLeft <= 0) {
-          clearTimer();
-          checkStartRoulette();
-        }
-      }
-      
-      updateTimer();
-      gameState.timerInterval = setInterval(updateTimer, 1000);
-    }
-
-    // Очистка таймера
-    function clearTimer() {
-      if (gameState.timerInterval) {
-        clearInterval(gameState.timerInterval);
-        gameState.timerInterval = null;
-      }
-    }
-
-    // Проверка старта рулетки
-    function checkStartRoulette() {
-      roomRef.once('value').then(snap => {
-        const room = snap.val();
-        if (room?.status === 'betting' && Object.keys(room.players || {}).length >= 2) {
-          startRoulette(room);
-        }
-      });
-    }
-
-    // Обновление отображения рулетки
-    function updateRouletteDisplay(players) {
-      elements.rouletteSlots.innerHTML = '';
-      const activePlayers = Object.values(players).filter(p => p?.color);
-      const totalPlayers = activePlayers.length;
-      if (totalPlayers === 0) return;
-      
-      gameState.slotWidth = 100 / totalPlayers;
-      activePlayers.forEach((player, index) => {
-        createSlot(player, index, totalPlayers);
-        createSlot(player, index + totalPlayers, totalPlayers);
-      });
-    }
-
-    // Создание слота
-    function createSlot(player, index, totalPlayers) {
-      const slot = document.createElement('div');
-      slot.className = 'roulette-slot';
-      slot.style.backgroundColor = player.color;
-      slot.style.width = `${gameState.slotWidth}%`;
-      slot.style.left = `${index * gameState.slotWidth}%`;
-      
-      const percent = document.createElement('div');
-      percent.className = 'slot-percent';
-      percent.textContent = `${Math.round(100/totalPlayers)}%`;
-      percent.style.color = getContrastColor(player.color);
-      slot.appendChild(percent);
-      
-      elements.rouletteSlots.appendChild(slot);
-    }
-
-    // Запуск рулетки
-    function startRoulette(room) {
-      const activePlayers = Object.entries(room.players || {}).filter(([_,p]) => p?.color);
-      if (activePlayers.length < 2) return resetRoom();
-      
-      roomRef.update({status:'spinning'}).then(() => {
-        const spinDuration = 5000;
-        const winnerIndex = Math.floor(Math.random() * activePlayers.length);
-        const winnerId = activePlayers[winnerIndex][0];
-        const winner = activePlayers[winnerIndex][1];
-        gameState.slotWidth = 100 / activePlayers.length;
+        gameState.isPlacingBet = true;
+        elements.placeBetBtn.disabled = true;
+        elements.placeBetBtn.textContent = 'Ставка принята';
         
-        animateRoulette(winnerIndex, spinDuration, () => {
-          roomRef.update({
-            status: 'finished',
-            winner: { id: winnerId, name: winner.name, color: winner.color },
-            finishTime: Date.now() + gameState.serverTimeOffset
-          }).then(() => {
-            if (winnerId === currentPlayer.id && currentPlayer.id.startsWith('tg_')) {
-              db.ref(`users/${currentPlayer.id}/balance`).transaction(balance => {
-                return (balance || 0) + 20;
-              });
-              db.ref(`users/${currentPlayer.id}/stats/wins`).transaction(wins => {
-                return (wins || 0) + 1;
-              });
+        try {
+          await firebase.database().ref('pvpRoulette/room').transaction(room => {
+            if (!room) room = { status: 'waiting', players: {}, startTime: null, winner: null };
+            if (room.status !== 'waiting' && room.status !== 'betting') throw new Error('Ставки закрыты');
+            if (room.players?.[currentPlayer.id]) throw new Error('Вы уже сделали ставку');
+            
+            const usedColors = Object.values(room.players || {}).map(p => p.color).filter(Boolean);
+            const availableColor = gameState.colors.find(c => !usedColors.includes(c)) || gameState.colors[0];
+            
+            room.players = room.players || {};
+            room.players[currentPlayer.id] = {
+              name: currentPlayer.name,
+              username: currentPlayer.username,
+              color: availableColor,
+              lastActive: Date.now(),
+              betAmount: 10
+            };
+            
+            if (Object.keys(room.players).length >= 2 && room.status === 'waiting') {
+              room.status = 'betting';
+              room.startTime = Date.now() + gameState.serverTimeOffset;
             }
-            setTimeout(resetRoom, 10000);
+            
+            return room;
+          });
+          
+          if (currentPlayer.id.startsWith('tg_')) {
+            await firebase.database().ref(`users/${currentPlayer.id}/balance`).transaction(balance => {
+              return (balance || 100) - 10;
+            });
+          }
+        } catch(err) {
+          alert(err.message);
+        } finally {
+          gameState.isPlacingBet = false;
+          updateButtonState();
+        }
+      }
+
+      // Обновление состояния кнопки
+      function updateButtonState() {
+        firebase.database().ref('pvpRoulette/room').once('value').then(snap => {
+          const room = snap.val();
+          if (room?.players?.[currentPlayer.id]) {
+            elements.placeBetBtn.disabled = true;
+            elements.placeBetBtn.textContent = 'Вы в игре';
+          } else {
+            elements.placeBetBtn.disabled = false;
+            elements.placeBetBtn.textContent = 'Сделать ставку (10💰)';
+          }
+        });
+      }
+
+      // Обработчик изменений в комнате
+      function roomListener(snap) {
+        const room = snap.val();
+        if (!room) return resetRoom();
+        
+        gameState.currentRoom = room;
+        const validPlayers = {};
+        
+        if (room.players) {
+          Object.entries(room.players).forEach(([id, player]) => {
+            if (player?.color && player?.name && player?.lastActive) {
+              validPlayers[id] = player;
+            }
+          });
+        }
+        
+        if (Object.keys(validPlayers).length !== Object.keys(room.players || {}).length) {
+          return firebase.database().ref('pvpRoulette/room/players').set(validPlayers);
+        }
+        
+        updateUI(room);
+      }
+
+      // Обновление интерфейса
+      function updateUI(room) {
+        clearTimer();
+        
+        switch(room.status) {
+          case 'waiting':
+            updateButtonState();
+            elements.timerDisplay.style.display = 'none';
+            elements.winnerDisplay.textContent = '';
+            break;
+            
+          case 'betting':
+            updateButtonState();
+            if (room.startTime) startTimer(room.startTime);
+            break;
+            
+          case 'spinning':
+            elements.placeBetBtn.disabled = true;
+            elements.timerDisplay.style.display = 'none';
+            break;
+            
+          case 'finished':
+            showWinner(room.winner);
+            elements.placeBetBtn.disabled = true;
+            elements.timerDisplay.style.display = 'none';
+            break;
+        }
+        
+        updateRouletteDisplay(room.players || {});
+      }
+
+      // Запуск таймера
+      function startTimer(startTime) {
+        clearTimer();
+        elements.timerDisplay.style.display = 'block';
+        
+        function updateTimer() {
+          const elapsed = Math.floor((Date.now() + gameState.serverTimeOffset - startTime) / 1000);
+          const timeLeft = Math.max(0, 30 - elapsed);
+          elements.timeLeftSpan.textContent = timeLeft;
+          
+          if (timeLeft <= 0) {
+            clearTimer();
+            checkStartRoulette();
+          }
+        }
+        
+        updateTimer();
+        gameState.timerInterval = setInterval(updateTimer, 1000);
+      }
+
+      // Очистка таймера
+      function clearTimer() {
+        if (gameState.timerInterval) {
+          clearInterval(gameState.timerInterval);
+          gameState.timerInterval = null;
+        }
+      }
+
+      // Проверка старта рулетки
+      function checkStartRoulette() {
+        firebase.database().ref('pvpRoulette/room').once('value').then(snap => {
+          const room = snap.val();
+          if (room?.status === 'betting' && Object.keys(room.players || {}).length >= 2) {
+            startRoulette(room);
+          }
+        });
+      }
+
+      // Сброс комнаты
+      function resetRoom() {
+        clearTimer();
+        if (gameState.currentAnimation) {
+          cancelAnimationFrame(gameState.currentAnimation);
+          gameState.currentAnimation = null;
+        }
+        
+        const roomData = {
+          status: 'waiting',
+          players: {},
+          startTime: null,
+          winner: null,
+          lastReset: Date.now() + gameState.serverTimeOffset
+        };
+        
+        return firebase.database().ref('pvpRoulette/room').set(roomData);
+      }
+
+      // Обновление отображения рулетки
+      function updateRouletteDisplay(players) {
+        elements.rouletteSlots.innerHTML = '';
+        const activePlayers = Object.values(players).filter(p => p?.color);
+        const totalPlayers = activePlayers.length;
+        if (totalPlayers === 0) return;
+        
+        gameState.slotWidth = 100 / totalPlayers;
+        activePlayers.forEach((player, index) => {
+          createSlot(player, index, totalPlayers);
+          createSlot(player, index + totalPlayers, totalPlayers);
+        });
+      }
+
+      // Создание слота
+      function createSlot(player, index, totalPlayers) {
+        const slot = document.createElement('div');
+        slot.className = 'roulette-slot';
+        slot.style.backgroundColor = player.color;
+        slot.style.width = `${gameState.slotWidth}%`;
+        slot.style.left = `${index * gameState.slotWidth}%`;
+        
+        const percent = document.createElement('div');
+        percent.className = 'slot-percent';
+        percent.textContent = `${Math.round(100/totalPlayers)}%`;
+        percent.style.color = getContrastColor(player.color);
+        slot.appendChild(percent);
+        
+        elements.rouletteSlots.appendChild(slot);
+      }
+
+      // Запуск рулетки
+      function startRoulette(room) {
+        const activePlayers = Object.entries(room.players || {}).filter(([_,p]) => p?.color);
+        if (activePlayers.length < 2) return resetRoom();
+        
+        firebase.database().ref('pvpRoulette/room/status').set('spinning').then(() => {
+          const spinDuration = 5000;
+          const winnerIndex = Math.floor(Math.random() * activePlayers.length);
+          const winnerId = activePlayers[winnerIndex][0];
+          const winner = activePlayers[winnerIndex][1];
+          gameState.slotWidth = 100 / activePlayers.length;
+          
+          animateRoulette(winnerIndex, spinDuration, () => {
+            firebase.database().ref('pvpRoulette/room').update({
+              status: 'finished',
+              winner: { id: winnerId, name: winner.name, color: winner.color },
+              finishTime: Date.now() + gameState.serverTimeOffset
+            }).then(() => {
+              if (winnerId === currentPlayer.id && currentPlayer.id.startsWith('tg_')) {
+                firebase.database().ref(`users/${currentPlayer.id}/balance`).transaction(balance => {
+                  return (balance || 0) + 20;
+                });
+                firebase.database().ref(`users/${currentPlayer.id}/stats/wins`).transaction(wins => {
+                  return (wins || 0) + 1;
+                });
+              }
+              setTimeout(resetRoom, 10000);
+            });
           });
         });
-      });
-    }
-
-    // Анимация рулетки
-    function animateRoulette(winnerIndex, duration, callback) {
-      const startTime = Date.now();
-      const totalSlots = Object.keys(gameState.currentRoom?.players || {}).length;
-      const targetPosition = 100 - winnerIndex * gameState.slotWidth;
-      const totalWidth = totalSlots * gameState.slotWidth * 2;
-      
-      elements.rouletteSlotsWrapper.style.transition = 'none';
-      elements.rouletteSlotsWrapper.style.transform = 'translateX(0)';
-      
-      function animate() {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(elapsed/duration, 1);
-        const easingProgress = progress < 0.8 ? progress*1.25 : 0.8+easeInOutQuad((progress-0.8)/0.2)*0.2;
-        const currentPosition = easingProgress * targetPosition;
-        const wrappedPosition = currentPosition % totalWidth;
-        
-        elements.rouletteSlotsWrapper.style.transform = `translateX(-${wrappedPosition}%)`;
-        
-        if (progress < 1) {
-          gameState.currentAnimation = requestAnimationFrame(animate);
-        } else {
-          gameState.currentAnimation = null;
-          callback();
-        }
       }
-      
-      function easeOutQuad(t) { return t*(2-t); }
-      function easeInOutQuad(t) { return t<0.5 ? 2*t*t : -1+(4-2*t)*t; }
-      
-      gameState.currentAnimation = requestAnimationFrame(animate);
-    }
 
-    // Показ победителя
-    function showWinner(winner) {
-      if (!winner) return;
-      
-      const isWinner = winner.id === currentPlayer.id;
-      elements.winnerDisplay.innerHTML = `
-        <div class="winner-box" style="background-color:${winner.color || '#7f5af0'}">
-          ${isWinner ? '🎉 Вы победили! +20💰' : `Победитель: ${winner.name || 'Неизвестный игрок'}!`}
-        </div>`;
-    }
+      // Анимация рулетки
+      function animateRoulette(winnerIndex, duration, callback) {
+        const startTime = Date.now();
+        const totalSlots = Object.keys(gameState.currentRoom?.players || {}).length;
+        const targetPosition = 100 - winnerIndex * gameState.slotWidth;
+        const totalWidth = totalSlots * gameState.slotWidth * 2;
+        
+        elements.rouletteSlotsWrapper.style.transition = 'none';
+        elements.rouletteSlotsWrapper.style.transform = 'translateX(0)';
+        
+        function animate() {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed/duration, 1);
+          const easingProgress = progress < 0.8 ? progress*1.25 : 0.8+easeInOutQuad((progress-0.8)/0.2)*0.2;
+          const currentPosition = easingProgress * targetPosition;
+          const wrappedPosition = currentPosition % totalWidth;
+          
+          elements.rouletteSlotsWrapper.style.transform = `translateX(-${wrappedPosition}%)`;
+          
+          if (progress < 1) {
+            gameState.currentAnimation = requestAnimationFrame(animate);
+          } else {
+            gameState.currentAnimation = null;
+            callback();
+          }
+        }
+        
+        function easeOutQuad(t) { return t*(2-t); }
+        function easeInOutQuad(t) { return t<0.5 ? 2*t*t : -1+(4-2*t)*t; }
+        
+        gameState.currentAnimation = requestAnimationFrame(animate);
+      }
 
-    // Получение контрастного цвета
-    function getContrastColor(hex) {
-      if (!hex || typeof hex !== 'string' || hex.length < 7) return '#FFFFFF';
-      const r = parseInt(hex.substring(1,3),16);
-      const g = parseInt(hex.substring(3,5),16);
-      const b = parseInt(hex.substring(5,7),16);
-      return (r*299 + g*587 + b*114)/1000 > 128 ? '#000000' : '#FFFFFF';
-    }
+      // Показ победителя
+      function showWinner(winner) {
+        if (!winner) return;
+        
+        const isWinner = winner.id === currentPlayer.id;
+        elements.winnerDisplay.innerHTML = `
+          <div class="winner-box" style="background-color:${winner.color || '#7f5af0'}">
+            ${isWinner ? '🎉 Вы победили! +20💰' : `Победитель: ${winner.name || 'Неизвестный игрок'}!`}
+          </div>`;
+      }
 
-    // При загрузке страницы
-    document.addEventListener('DOMContentLoaded', () => {
-      initPlayer();
-      initRouletteGame();
+      // Получение контрастного цвета
+      function getContrastColor(hex) {
+        if (!hex || typeof hex !== 'string' || hex.length < 7) return '#FFFFFF';
+        const r = parseInt(hex.substring(1,3),16);
+        const g = parseInt(hex.substring(3,5),16);
+        const b = parseInt(hex.substring(5,7),16);
+        return (r*299 + g*587 + b*114)/1000 > 128 ? '#000000' : '#FFFFFF';
+      }
+
+      // Проверка неактивных игроков
+      function checkInactivePlayers() {
+        firebase.database().ref('pvpRoulette/room/players').once('value', snap => {
+          const players = snap.val() || {};
+          const now = Date.now();
+          Object.entries(players).forEach(([id, player]) => {
+            if (now - player.lastActive > 30000) {
+              firebase.database().ref(`pvpRoulette/room/players/${id}`).remove();
+            }
+          });
+        });
+      }
+
+      // Запуск игры
+      initGame();
     });
   </script>
 </body>

@@ -1,25 +1,37 @@
+let isInitialLoad = true;
+
 document.addEventListener('DOMContentLoaded', () => {
-  // Инициализация анимации
-  setTimeout(() => {
-    const ring = document.getElementById('ring');
-    const title = document.getElementById('title');
-    const container = document.getElementById('ring-container');
-    
-    if (ring && title && container) {
-      setTimeout(() => {
-        container.style.opacity = '0';
+  if (isInitialLoad) {
+    // Анимация только при первом запуске
+    setTimeout(() => {
+      const ring = document.getElementById('ring');
+      const title = document.getElementById('title');
+      
+      if (ring && title) {
         setTimeout(() => {
-          container.remove();
-          initMenu();
-        }, 1000);
-      }, 6000);
-    }
-  }, 100);
+          const container = document.getElementById('ring-container');
+          if (container) {
+            container.style.opacity = '0';
+            setTimeout(() => {
+              container.remove();
+              initMenu();
+            }, 1000);
+          }
+        }, 6000);
+      }
+    }, 100);
+    isInitialLoad = false;
+  } else {
+    // При переходах сразу показываем меню
+    initMenu();
+  }
 });
 
 function initMenu() {
+  if (document.getElementById('main-menu')) return;
+
   const menuHTML = `
-    <div id="main-menu">
+    <div id="main-menu" style="opacity:0">
       <div class="menu-buttons">
         <button class="menu-btn profile-btn" id="profile-btn">
           <span class="btn-icon">👤</span>
@@ -38,16 +50,25 @@ function initMenu() {
   `;
   
   document.body.insertAdjacentHTML('beforeend', menuHTML);
+  
+  // Плавное появление
+  setTimeout(() => {
+    const menu = document.getElementById('main-menu');
+    if (menu) menu.style.opacity = '1';
+  }, 50);
 
-  // Обработчики кнопок
-  document.getElementById('profile-btn').addEventListener('click', showProfile);
-  document.getElementById('shop-btn').addEventListener('click', showShop);
-  document.getElementById('pvp-btn').addEventListener('click', () => {
-    window.location.href = 'pvp-game.html';
-  });
+  // Обработчики
+  document.getElementById('profile-btn')?.addEventListener('click', showProfile);
+  document.getElementById('shop-btn')?.addEventListener('click', showShop);
+  document.getElementById('pvp-btn')?.addEventListener('click', goToPvp);
 }
 
 function showProfile() {
+  if (!window.currentPlayer) {
+    console.error('Player data not loaded');
+    return;
+  }
+
   const profileHTML = `
     <div id="profile-panel" class="slide-panel">
       <div class="panel-content">
@@ -65,18 +86,10 @@ function showProfile() {
   
   document.body.insertAdjacentHTML('beforeend', profileHTML);
   const panel = document.getElementById('profile-panel');
-  setTimeout(() => {
-    panel.classList.add('active');
-    
-    // Позиционируем стрелку
-    const profileBtn = document.getElementById('profile-btn');
-    const btnRect = profileBtn.getBoundingClientRect();
-    panel.style.setProperty('--arrow-pos', `${btnRect.left + btnRect.width/2}px`);
-  }, 10);
+  setTimeout(() => panel.classList.add('active'), 10);
   
-  document.getElementById('update-nickname-btn').addEventListener('click', updateNickname);
+  document.getElementById('update-nickname-btn')?.addEventListener('click', updateNickname);
   
-  // Закрытие при клике вне панели
   panel.addEventListener('click', (e) => {
     if (e.target === panel) {
       panel.classList.remove('active');
@@ -105,16 +118,8 @@ function showShop() {
   
   document.body.insertAdjacentHTML('beforeend', shopHTML);
   const panel = document.getElementById('shop-panel');
-  setTimeout(() => {
-    panel.classList.add('active');
-    
-    // Позиционируем стрелку
-    const shopBtn = document.getElementById('shop-btn');
-    const btnRect = shopBtn.getBoundingClientRect();
-    panel.style.setProperty('--arrow-pos', `${btnRect.left + btnRect.width/2}px`);
-  }, 10);
+  setTimeout(() => panel.classList.add('active'), 10);
   
-  // Закрытие при клике вне панели
   panel.addEventListener('click', (e) => {
     if (e.target === panel) {
       panel.classList.remove('active');
@@ -123,8 +128,12 @@ function showShop() {
   });
 }
 
+function goToPvp() {
+  window.location.href = 'pvp-game.html';
+}
+
 function updateNickname() {
-  const newNickname = document.getElementById('nickname-input').value.trim();
+  const newNickname = document.getElementById('nickname-input')?.value.trim();
   if (newNickname && newNickname !== currentPlayer.name) {
     currentPlayer.name = newNickname;
     if (currentPlayer.id.startsWith('tg_')) {
@@ -132,6 +141,5 @@ function updateNickname() {
     } else {
       localStorage.setItem('localUser', JSON.stringify(currentPlayer));
     }
-    document.querySelector('#profile-panel .profile-header h2').textContent = newNickname;
   }
 }

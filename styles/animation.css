@@ -239,3 +239,27 @@
   width: 100%;
   cursor: pointer;
 }
+
+/* Анимации для меню */
+#main-menu {
+  animation: menuFadeIn 0.5s ease-out forwards;
+}
+
+@keyframes menuFadeIn {
+  0% { opacity: 0; transform: translateY(50px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Анимации для панелей */
+.slide-panel {
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.slide-panel.active {
+  animation: panelSlideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes panelSlideUp {
+  0% { height: 0; opacity: 0; }
+  100% { height: 70vh; opacity: 1; }
+}
