@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Gizmo PVP</title>
@@ -32,7 +33,6 @@
     </div>
   </div>
 
-  <!-- Меню -->
   <div id="main-menu" style="opacity:0">
     <div class="menu-buttons">
       <button class="menu-btn" onclick="window.location.href='index.html'">
@@ -51,7 +51,6 @@
   </div>
 
   <script>
-    // Проверка инициализации currentPlayer
     if (!window.currentPlayer) {
       window.currentPlayer = {
         id: 'local_' + Math.random().toString(36).substring(2, 9),
@@ -61,17 +60,14 @@
       };
     }
 
-    // Инициализация Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
       databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
     };
     
-    // Уникальное имя для инициализации
     const pvpApp = firebase.initializeApp(firebaseConfig, 'pvpApp');
     const db = firebase.database(pvpApp);
 
-    // Состояние игры
     const gameState = {
       colors: ['#FF5252','#4CAF50','#2196F3','#FFC107','#9C27B0','#00BCD4'],
       slotWidth: 0,
@@ -82,7 +78,6 @@
       currentRoom: null
     };
 
-    // Элементы интерфейса
     const elements = {
       rouletteSlots: document.getElementById('roulette-slots'),
       rouletteSlotsWrapper: document.getElementById('roulette-slots-wrapper'),
@@ -93,31 +88,25 @@
       rouletteArrow: document.getElementById('roulette-arrow')
     };
 
-    // Инициализация игры
     function initGame() {
-      // Плавное появление меню
       setTimeout(() => {
         const menu = document.getElementById('main-menu');
         if (menu) menu.style.opacity = '1';
       }, 500);
 
-      // Получение времени сервера
       db.ref('.info/serverTimeOffset').on('value', snap => {
         gameState.serverTimeOffset = snap.val() || 0;
       });
 
-      // Инициализация комнаты
       db.ref('pvpRoulette/room').once('value').then(snap => {
         if (!snap.exists()) resetRoom();
       });
 
-      // Обработчики событий
       elements.placeBetBtn.addEventListener('click', placeBetHandler);
       db.ref('pvpRoulette/room').on('value', roomListener);
       setInterval(checkInactivePlayers, 60000);
     }
 
-    // Обработчик ставки
     async function placeBetHandler() {
       if (gameState.isPlacingBet || !currentPlayer?.id) return;
       
@@ -164,7 +153,6 @@
       }
     }
 
-    // Обновление состояния кнопки ставки
     function updateButtonState() {
       db.ref('pvpRoulette/room').once('value').then(snap => {
         const room = snap.val();
@@ -178,7 +166,6 @@
       });
     }
 
-    // Обработчик изменений в комнате
     function roomListener(snap) {
       const room = snap.val();
       if (!room) return resetRoom();
@@ -187,7 +174,6 @@
       updateUI(room);
     }
 
-    // Обновление интерфейса
     function updateUI(room) {
       clearTimer();
       
@@ -218,7 +204,6 @@
       updateRouletteDisplay(room.players || {});
     }
 
-    // Обновление отображения рулетки
     function updateRouletteDisplay(players) {
       elements.rouletteSlots.innerHTML = '';
       const activePlayers = Object.values(players).filter(p => p?.color);
@@ -232,7 +217,6 @@
       });
     }
 
-    // Создание слота рулетки
     function createSlot(player, index, totalPlayers) {
       const slot = document.createElement('div');
       slot.className = 'roulette-slot';
@@ -249,7 +233,6 @@
       elements.rouletteSlots.appendChild(slot);
     }
 
-    // Запуск рулетки
     function startRoulette(room) {
       const activePlayers = Object.entries(room.players || {}).filter(([_,p]) => p?.color);
       if (activePlayers.length < 2) return resetRoom();
@@ -281,7 +264,6 @@
       });
     }
 
-    // Анимация рулетки
     function animateRoulette(winnerIndex, duration, callback) {
       const startTime = Date.now();
       const totalSlots = Object.keys(gameState.currentRoom?.players || {}).length;
@@ -314,7 +296,6 @@
       gameState.currentAnimation = requestAnimationFrame(animate);
     }
 
-    // Показ победителя
     function showWinner(winner) {
       if (!winner) return;
       
@@ -325,7 +306,6 @@
         </div>`;
     }
 
-    // Получение контрастного цвета
     function getContrastColor(hex) {
       if (!hex || typeof hex !== 'string' || hex.length < 7) return '#FFFFFF';
       const r = parseInt(hex.substring(1,3),16);
@@ -334,7 +314,6 @@
       return (r*299 + g*587 + b*114)/1000 > 128 ? '#000000' : '#FFFFFF';
     }
 
-    // Проверка неактивных игроков
     function checkInactivePlayers() {
       db.ref('pvpRoulette/room/players').once('value', snap => {
         const players = snap.val() || {};
@@ -347,7 +326,6 @@
       });
     }
 
-    // Сброс комнаты
     function resetRoom() {
       clearTimer();
       if (gameState.currentAnimation) {
@@ -366,7 +344,6 @@
       return db.ref('pvpRoulette/room').set(roomData);
     }
 
-    // Запуск таймера
     function startTimer(startTime) {
       clearTimer();
       elements.timerDisplay.style.display = 'block';
@@ -386,7 +363,6 @@
       gameState.timerInterval = setInterval(updateTimer, 1000);
     }
 
-    // Очистка таймера
     function clearTimer() {
       if (gameState.timerInterval) {
         clearInterval(gameState.timerInterval);
@@ -394,7 +370,6 @@
       }
     }
 
-    // Проверка старта рулетки
     function checkStartRoulette() {
       db.ref('pvpRoulette/room').once('value').then(snap => {
         const room = snap.val();
@@ -404,7 +379,6 @@
       });
     }
 
-    // Запуск игры
     document.addEventListener('DOMContentLoaded', initGame);
   </script>
 </body>
