@@ -3,7 +3,6 @@ let currentPlayer = {
   name: 'Игрок'
 };
 
-// Добавьте в initTelegram()
 function initTelegram() {
   if (window.Telegram && Telegram.WebApp) {
     const user = Telegram.WebApp.initDataUnsafe.user;
@@ -19,10 +18,8 @@ function initTelegram() {
         document.getElementById('user-nickname').textContent = currentPlayer.username;
       }
       
-      // Отправляем статус активности
       updateUserPresence(true);
       
-      // Обработчик закрытия приложения
       Telegram.WebApp.onEvent('viewportChanged', (e) => {
         if (e.isStateStable && !e.isExpanded) {
           updateUserPresence(false);
@@ -40,7 +37,6 @@ function initTelegram() {
   window.currentPlayer = currentPlayer;
 }
 
-// Функция обновления статуса активности
 async function updateUserPresence(isActive) {
   try {
     await firebase.database().ref(`userPresence/${currentPlayer.id}`).set(isActive);
@@ -49,11 +45,9 @@ async function updateUserPresence(isActive) {
   }
 }
 
-// При загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
   initTelegram();
   
-  // При закрытии страницы
   window.addEventListener('beforeunload', () => {
     updateUserPresence(false);
   });
@@ -69,6 +63,22 @@ function switchTab(tabName) {
   
   document.getElementById(tabName).classList.add('active');
   event.target.classList.add('active');
+}
+
+function updateNickname() {
+  const newNickname = document.getElementById('nickname-input').value.trim();
+  if (newNickname && newNickname !== currentPlayer.name) {
+    currentPlayer.name = newNickname;
+    
+    if (currentPlayer.id.startsWith('tg_')) {
+      firebase.database().ref(`users/${currentPlayer.id}/name`).set(newNickname)
+        .catch(error => console.error('Ошибка сохранения ника:', error));
+    } else {
+      localStorage.setItem('localUser', JSON.stringify(currentPlayer));
+    }
+    
+    document.getElementById('username').textContent = newNickname;
+  }
 }
 
 document.addEventListener('DOMContentLoaded', initTelegram);

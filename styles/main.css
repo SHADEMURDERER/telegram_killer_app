@@ -55,14 +55,6 @@ body {
   text-shadow: 0 0 8px #7f5af0;
 }
 
-.shop-item {
-  margin: 15px 0;
-  padding: 15px;
-  background: rgba(58, 56, 54, 0.5);
-  border-radius: 12px;
-  border-left: 3px solid #7f5af0;
-}
-
 @keyframes slideUp {
   0% { bottom: -300px; opacity: 0; }
   100% { bottom: 30px; opacity: 1; }
