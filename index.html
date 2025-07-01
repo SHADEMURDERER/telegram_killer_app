@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Gizmo App</title>
+  <title>Gizmo Gift Tracker</title>
   <link rel="stylesheet" href="styles/main.css">
   <link rel="stylesheet" href="styles/animation.css">
+  <link rel="stylesheet" href="styles/gifts.css">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
@@ -17,14 +18,20 @@
   <div id="panel">
     <div class="tab-buttons">
       <button class="tab-button active" onclick="switchTab('profile')">Профиль</button>
+      <button class="tab-button" onclick="switchTab('gifts')">Мои Подарки</button>
     </div>
     
     <div id="profile" class="tab-content active">
       <h2>Добро пожаловать, <span id="username">Игрок</span>!</h2>
-      <p>Ваш ник: <span id="user-nickname">@username</span></p>
-      <input type="text" id="nickname-input" placeholder="Новый ник">
-      <button onclick="updateNickname()">Изменить ник</button>
-      <p>Ваш статус: Новичок</p>
+      <p>Ваш Telegram ID: <span id="user-id">Неизвестно</span></p>
+      <p>Ваш баланс: <span id="user-balance">0</span> TON</p>
+    </div>
+    
+    <div id="gifts" class="tab-content">
+      <h2>Мои подарки</h2>
+      <div id="gifts-container">
+        <p>Загрузка подарков...</p>
+      </div>
     </div>
   </div>
 </div>
@@ -41,8 +48,13 @@
   // Инициализация Firebase
   const app = firebase.initializeApp(firebaseConfig);
   window.db = firebase.database(app);
+  
+  // Конфигурация TON API
+  const TON_API_KEY = "ВАШ_TON_API_КЛЮЧ";
+  const GIFT_BOT_USERNAME = "gizmo_gift";
 </script>
 <script src="scripts/main.js"></script>
 <script src="scripts/animation.js"></script>
+<script src="scripts/gifts.js"></script>
 </body>
 </html>
