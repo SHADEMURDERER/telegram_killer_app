@@ -4,6 +4,13 @@ let currentPlayer = {
 };
 
 function initTelegram() {
+
+  if (!firebase.apps.length) {
+      firebase.initializeApp({
+          apiKey: "AIzaSyC6EklCDD25kU_nuXyeh5mj9F24KECyYpM",
+          databaseURL: "https://gizmo-27843-default-rtdb.firebaseio.com"
+      });
+  }
   if (window.Telegram && Telegram.WebApp) {
     const user = Telegram.WebApp.initDataUnsafe.user;
     if (user?.id) {
@@ -47,33 +54,39 @@ async function updateUserPresence(isActive) {
 
 async function loadUserGifts() {
   try {
-    const userId = currentPlayer.id;
+    const userId = window.currentPlayer?.id;
     if (!userId) return;
+
+    const snapshot = await firebase.database()
+      .ref(`users/${userId}/gifts`)
+      .once('value');
     
-    const snapshot = await firebase.database().ref(`users/${userId}/gifts`).once('value');
     const gifts = snapshot.val() || {};
-    
-    const giftsList = document.getElementById('gifts-list');
-    if (!giftsList) return;
-    
-    giftsList.innerHTML = '';
-    
-    Object.values(gifts).forEach(gift => {
-      const giftCard = document.createElement('div');
-      giftCard.className = 'gift-card';
-      giftCard.innerHTML = `
-        <div class="gift-title">${gift.title || 'NFT Подарок'}</div>
-        <div class="gift-price">${gift.price || '0'} TON</div>
-      `;
-      giftsList.appendChild(giftCard);
-    });
-    
+    displayGifts(gifts);
   } catch (error) {
-    console.error('Ошибка загрузки подарков:', error);
+    console.error("Ошибка загрузки подарков:", error);
   }
 }
 
-// Вызывайте эту функцию при загрузке профиля
+// Функция отображения подарков
+function displayGifts(gifts) {
+  const container = document.getElementById('gifts-container');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  Object.entries(gifts).forEach(([id, gift]) => {
+    const giftElement = document.createElement('div');
+    giftElement.className = 'gift-card';
+    giftElement.innerHTML = `
+      <div class="gift-icon">🎁</div>
+      <div class="gift-title">${gift.title || 'NFT Подарок'}</div>
+      <div class="gift-price">${gift.price || '0'} TON</div>
+    `;
+    container.appendChild(giftElement);
+  });
+}
+
 function switchTab(tabName) {
   document.querySelectorAll('.tab-content').forEach(tab => {
     tab.classList.remove('active');
@@ -85,7 +98,7 @@ function switchTab(tabName) {
   document.getElementById(tabName).classList.add('active');
   event.target.classList.add('active');
   
-  if (tabName === 'gifts-section') {
+  if (tabName === 'profile') {
     loadUserGifts();
   }
 }
@@ -97,17 +110,3 @@ document.addEventListener('DOMContentLoaded', () => {
     updateUserPresence(false);
   });
 });
-
-function switchTab(tabName) {
-  document.querySelectorAll('.tab-content').forEach(tab => {
-    tab.classList.remove('active');
-  });
-  document.querySelectorAll('.tab-button').forEach(btn => {
-    btn.classList.remove('active');
-  });
-  
-  document.getElementById(tabName).classList.add('active');
-  event.target.classList.add('active');
-}
-
-document.addEventListener('DOMContentLoaded', initTelegram);
